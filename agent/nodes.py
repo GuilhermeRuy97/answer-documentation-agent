@@ -16,10 +16,23 @@ client = anthropic.Anthropic()
 
 def rewrite_query(state: AgentState) -> dict:
     query = state["query"]
+
+    history = state.get("messages", [])
+    history_text = ""
+    if history:
+        lines = []
+        for msg in history[-4:]:  # last 2 turns
+            role = "User" if isinstance(msg, HumanMessage) else "Assistant"
+            lines.append(f"{role}: {msg.content[:300]}")
+        history_text = "\nConversation so far:\n" + "\n".join(lines) + "\n"
+
     prompt = (
-        f"Given this question: {query}\n"
-        "Generate 2 alternative phrasings that might retrieve better results "
-        "from a vector database of prompt engineering documentation.\n"
+        f"{history_text}"
+        f"New question: {query}\n\n"
+        "Generate 2 alternative phrasings of the new question that would retrieve better results "
+        "from a vector database of prompt engineering documentation. "
+        "If the question is a follow-up (e.g. 'give me an example'), use the conversation context "
+        "to make each phrasing self-contained and specific.\n"
         "Return ONLY a JSON array of 2 strings. No explanation."
     )
     try:
@@ -28,7 +41,14 @@ def rewrite_query(state: AgentState) -> dict:
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )
-        variants = json.loads(response.content[0].text)
+        raw = response.content[0].text.strip()
+        # Strip markdown code fences if Claude wrapped the JSON
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        variants = json.loads(raw)
         logger.info(f"Generated {len(variants)} query variants")
         return {"rewritten_queries": [query] + variants}
     except Exception:
