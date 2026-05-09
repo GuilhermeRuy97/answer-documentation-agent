@@ -14,7 +14,7 @@ Requirements:
 - Import retrieve from retrieval.retriever
 - Import os
 
-- Load RELEVANCE_THRESHOLD (default 0.70) and MAX_RETRY_COUNT (default 2) from env
+- Load RELEVANCE_THRESHOLD (default 0.65) and MAX_RETRY_COUNT (default 2) from env
 
 SEARCH NODE (wrap retriever as a node, not a tool):
   def search_docs_node(state: AgentState) -> dict:
