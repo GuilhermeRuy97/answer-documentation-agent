@@ -292,4 +292,14 @@ uv run python evaluation/run_eval.py
 
 # Important
 
-- Make real tests to check if the implementation is correct and the code is working as expected.
+1. Make real tests to check if the implementation is correct and the code is working as expected.
+- Define success criteria. Loop until verified.
+2. Don't assume:
+- If multiple interpretations exist, present them - don't pick silently.
+- If something is unclear, stop. Name what is confusing. Ask.
+3. Simplicity first:
+- Ask yourself: "Would a senior engineer say this is overcomplicated?" If the answer is yes, simplify.
+4. Touch only what you must. Clean up only your own mess.
+5. If you noticed unrelated dead code, mention it - don't delete it. When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
