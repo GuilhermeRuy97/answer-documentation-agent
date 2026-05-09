@@ -1,97 +1,135 @@
 {
-    "_comment": "15 Q&A pairs over docs.anthropic.com/en/docs/build-with-claude/prompt-engineering. Fill in 'answer' and 'source_url' after running ingestion. These are your ground truth for LangSmith evaluation.",
-    "dataset_name": "anthropic-prompt-engineering-eval-v1",
-    "questions": [
-      {
-        "id": "q01",
-        "question": "What are XML tags used for in Claude prompts and why are they recommended?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags"
-      },
-      {
-        "id": "q02",
-        "question": "How does chain-of-thought prompting improve Claude's reasoning?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought"
-      },
-      {
-        "id": "q03",
-        "question": "What is the recommended structure for a system prompt in Claude?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts"
-      },
-      {
-        "id": "q04",
-        "question": "How do few-shot examples help Claude produce better outputs?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/few-shot-prompting"
-      },
-      {
-        "id": "q05",
-        "question": "What is prompt chaining and when should you use it?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts"
-      },
-      {
-        "id": "q06",
-        "question": "What is prefilling in Claude prompts and what is it useful for?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response"
-      },
-      {
-        "id": "q07",
-        "question": "How should long documents be positioned in a Claude prompt for best results?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips"
-      },
-      {
-        "id": "q08",
-        "question": "What does it mean to give Claude a role and how does it affect responses?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts"
-      },
-      {
-        "id": "q09",
-        "question": "How can you reduce hallucinations when asking Claude factual questions?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/reduce-hallucinations"
-      },
-      {
-        "id": "q10",
-        "question": "What is the difference between zero-shot and few-shot prompting?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/few-shot-prompting"
-      },
-      {
-        "id": "q11",
-        "question": "How do you ask Claude to output data in JSON format reliably?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/control-output-format"
-      },
-      {
-        "id": "q12",
-        "question": "What is the recommended way to iterate and improve a prompt that is not working?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-iteration"
-      },
-      {
-        "id": "q13",
-        "question": "How should you handle tasks that require Claude to say it does not know the answer?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/reduce-hallucinations"
-      },
-      {
-        "id": "q14",
-        "question": "What are the benefits of breaking a complex task into subtasks using prompt chaining?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts"
-      },
-      {
-        "id": "q15",
-        "question": "How does giving Claude explicit instructions about output length affect the response?",
-        "answer": "FILL_IN_AFTER_INGESTION",
-        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/control-output-format"
-      }
-    ]
-  }
-  
+  "_comment": "15 Q&A pairs over docs.anthropic.com/en/docs/build-with-claude/prompt-engineering. Fill in 'answer' and 'source_url' after running ingestion. These are your ground truth for LangSmith evaluation.",
+  "dataset_name": "anthropic-prompt-engineering-eval-v1",
+  "questions": [
+    {
+      "id": "q01",
+      "question": "What are XML tags used for in Claude prompts and why are they recommended?",
+      "answer": "Based on the provided documentation context, I don't have any documentation to reference for this question \u2014 no context was actually included in your message (the \"Context:\" section appears to be empty).\n\nIf you'd like me to answer this question accurately using Anthropic's documentation, please paste the relevant documentation text into the context field, and I'll be happy to provide a specific, cited response about XML tags in Claude prompts.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
+      "citations": []
+    },
+    {
+      "id": "q02",
+      "question": "How does chain-of-thought prompting improve Claude's reasoning?",
+      "answer": "Based on the provided documentation context, I don't have any documentation to reference for this question \u2014 no context was actually included in your message (the \"Context:\" section appears to be empty).\n\nTherefore, I cannot provide an answer based on the documentation as instructed. Could you please share the relevant Anthropic documentation context you'd like me to use? Once you provide it, I'll be happy to give you a specific, sourced answer about how chain-of-thought prompting improves Claude's reasoning.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought",
+      "citations": []
+    },
+    {
+      "id": "q03",
+      "question": "What is the recommended structure for a system prompt in Claude?",
+      "answer": "Based on the provided documentation, here is the recommended structure for a system prompt in Claude:\n\n1. **Give Claude a role**: Set a role in the system prompt to focus Claude's behavior and tone. Even a single sentence makes a difference. For example, you might specify \"You are an expert customer service representative\" or similar.\n\n2. **Use XML tags to organize content**: Structure your system prompt with XML tags to help Claude parse complex prompts unambiguously, especially when mixing instructions, context, examples, and variable inputs. Recommended tags include:\n   - `<instructions>` for directives\n   - `<context>` for background information\n   - `<input>` for variable inputs\n   - `<examples>` / `<example>` for examples\n\n3. **Include examples**: When adding examples to your system prompt, make them:\n   - **Relevant**: Mirror your actual use case closely\n   - **Diverse**: Cover edge cases and vary enough to avoid unintended patterns\n   - **Structured**: Wrap in `<example>` tags (or `<examples>` for multiple)\n   - Include **3\u20135 examples** for best results\n\nThe documentation emphasizes using **consistent, descriptive tag names** across your prompts and nesting tags when content has a natural hierarchy (e.g., documents inside `<documents>`, each inside `<document index=\"n\">`).\n\nSources: [1] Claude Prompting Best Practices",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
+      "citations": [
+        {
+          "title": "Claude Prompting Best Practices",
+          "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+          "snippet": "When adding examples, make them:\n\n- **Relevant:** Mirror your actual use case closely.\n- **Diverse:** Cover edge cases a..."
+        }
+      ]
+    },
+    {
+      "id": "q04",
+      "question": "How do few-shot examples help Claude produce better outputs?",
+      "answer": "Based on the provided documentation context, I don't have any documentation to reference for this question \u2014 no context was actually included in your message (the \"Context:\" section appears to be empty).\n\nCould you please provide the relevant documentation excerpts you'd like me to use? Once you share the context, I'll be happy to give you a specific, well-cited answer about how few-shot examples help Claude produce better outputs.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/few-shot-prompting",
+      "citations": []
+    },
+    {
+      "id": "q05",
+      "question": "What is prompt chaining and when should you use it?",
+      "answer": "Based on the provided documentation context, I don't have any documentation content to reference for this question \u2014 no context was actually included in your message (the \"Context:\" section appears to be empty).\n\nTo give you an accurate, sourced answer about prompt chaining from Anthropic's documentation, I would need the relevant documentation text to be included.\n\nCould you paste the relevant documentation content into the context? That way I can answer your question accurately and cite specific sources rather than relying on general knowledge.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
+      "citations": []
+    },
+    {
+      "id": "q06",
+      "question": "What is prefilling in Claude prompts and what is it useful for?",
+      "answer": "Based on the provided documentation context, I don't have any documentation context to reference for this question. No context was provided in the \"Context:\" section above.\n\nHowever, since you've asked me to answer only using provided documentation context, I'm unable to give you a sourced answer about prefilling in Claude prompts, as no relevant documentation was included in your query.\n\nIf you'd like an accurate, citation-backed answer, please paste the relevant Anthropic documentation text into the context field, and I'll be happy to answer your question precisely based on that material.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response",
+      "citations": []
+    },
+    {
+      "id": "q07",
+      "question": "How should long documents be positioned in a Claude prompt for best results?",
+      "answer": "According to the documentation, when working with large documents or data-rich inputs (20k+ tokens), you should **put longform data at the top** of your prompt. Specifically, place your long documents and inputs near the top of your prompt, **above your query, instructions, and examples**.\n\nThe documentation notes that \"Queries at the end can improve response quality by up to 30% in tests, especially with complex, multi-document inputs.\"\n\nSources: [1] Claude Prompting Best Practices",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips",
+      "citations": [
+        {
+          "title": "Claude Prompting Best Practices",
+          "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+          "snippet": "### Give Claude a role\n\nSetting a role in the system prompt focuses Claude's behavior and tone for your use case. Even a..."
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "question": "What does it mean to give Claude a role and how does it affect responses?",
+      "answer": "Based on the provided documentation context, I don't have any documentation context to reference for this question. No context was provided in your message.\n\nIf you could share the relevant Anthropic documentation, I would be happy to give you a specific, cited answer about how giving Claude a role (often done through system prompts using techniques like \"You are a helpful assistant specializing in...\") affects its responses.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
+      "citations": []
+    },
+    {
+      "id": "q09",
+      "question": "How can you reduce hallucinations when asking Claude factual questions?",
+      "answer": "Based on the provided documentation, here's how you can reduce hallucinations when asking Claude factual questions, particularly in coding contexts:\n\nYou can instruct Claude to **investigate before answering** rather than speculating. The documentation recommends using a prompt like:\n\n```\n<investigate_before_answering>\nNever speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.\n</investigate_before_answering>\n```\n\nThe key principles this demonstrates are:\n1. **Require investigation first** \u2014 Claude should read/examine relevant sources before responding\n2. **Prohibit speculation** \u2014 explicitly tell Claude not to make claims about things it hasn't verified\n3. **Demand grounded answers** \u2014 ask for responses based on actual evidence rather than assumptions\n\nThe documentation also notes that **Claude's latest models are inherently less prone to hallucinations** and provide more accurate, grounded answers \u2014 so using newer model versions is another way to reduce hallucinations.\n\nAdditionally, the documentation mentions that if a task or question is **unreasonable or infeasible**, Claude should be instructed to **inform you rather than work around it**, which helps prevent Claude from generating plausible-sounding but incorrect workarounds.\n\nSources: [1] Claude Prompting Best Practices",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/reduce-hallucinations",
+      "citations": [
+        {
+          "title": "Claude Prompting Best Practices",
+          "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+          "snippet": "If the task is unreasonable or infeasible, or if any of the tests are incorrect, please inform me rather than working ar..."
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "question": "What is the difference between zero-shot and few-shot prompting?",
+      "answer": "Based on the provided documentation context, I don't have any documentation context to reference for this question. No context was provided in your message (the \"Context:\" section appears to be empty).\n\nCould you please share the relevant Anthropic documentation you'd like me to reference? Once you provide the documentation context, I'll be happy to explain the difference between zero-shot and few-shot prompting based specifically on that material.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/few-shot-prompting",
+      "citations": []
+    },
+    {
+      "id": "q11",
+      "question": "How do you ask Claude to output data in JSON format reliably?",
+      "answer": "Based on the provided documentation context, I don't have any documentation to reference for this question. No context was actually provided in your message.\n\nHowever, if you'd like me to answer this question, please share the relevant Anthropic documentation, and I'll give you a specific, cited answer about how to reliably get Claude to output JSON format.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/control-output-format",
+      "citations": []
+    },
+    {
+      "id": "q12",
+      "question": "What is the recommended way to iterate and improve a prompt that is not working?",
+      "answer": "Based on the provided documentation context, I don't have any documentation context to reference for this question. No context was provided in your message (the \"Context:\" section appears to be empty).\n\nTo give you an accurate, well-cited answer about Anthropic's recommended approach to iterating and improving prompts, I would need the relevant documentation to be included.\n\nCould you please share the specific Anthropic documentation you'd like me to reference? Once you provide the context, I can give you a precise answer based on that material.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-iteration",
+      "citations": []
+    },
+    {
+      "id": "q13",
+      "question": "How should you handle tasks that require Claude to say it does not know the answer?",
+      "answer": "Based on the provided documentation context, I don't have any documentation to reference for this question. No context was provided in your message, so I cannot give you a specific answer citing Anthropic's documentation.\n\nIf you'd like me to answer this question accurately, please share the relevant documentation context, and I'll be happy to provide a specific, sourced response about how Claude should handle situations where it doesn't know an answer.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/reduce-hallucinations",
+      "citations": []
+    },
+    {
+      "id": "q14",
+      "question": "What are the benefits of breaking a complex task into subtasks using prompt chaining?",
+      "answer": "Based on the provided documentation context, I don't have any documentation context to reference for this question. No context was actually provided in your message (the \"Context:\" section appears to be empty).\n\nTo give you an accurate, well-cited answer about prompt chaining and its benefits from Anthropic's documentation, I would need the relevant documentation text to be included.\n\nCould you please provide the documentation context you'd like me to reference? Once you share it, I can give you a specific, sourced answer about the benefits of breaking complex tasks into subtasks using prompt chaining.",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
+      "citations": []
+    },
+    {
+      "id": "q15",
+      "question": "How does giving Claude explicit instructions about output length affect the response?",
+      "answer": "Based on the documentation, giving Claude explicit instructions about output length can help tune responses to match your product's needs, since Claude Opus 4.7 **calibrates response length based on task complexity** rather than defaulting to a fixed verbosity level.\n\nSpecifically, the documentation notes:\n\n- **Simple lookups** tend to produce shorter answers\n- **Open-ended analysis** tends to produce longer answers\n\nIf your product requires a specific verbosity style, you can add explicit instructions to your prompt. For example, to **decrease verbosity**, the docs suggest adding something like:\n\n> *\"Provide concise, focused responses. Skip non-essential context, and keep examples minimal.\"*\n\nThe documentation also offers this key guidance on effectiveness:\n\n> **Positive examples** showing how Claude can communicate with the appropriate level of concision tend to be **more effective** than negative examples or instructions that tell the model what *not* to do.\n\nSo rather than saying \"don't over-explain,\" it's better to show Claude an example of the desired concise style or describe what good output looks like.\n\n*Source: [Claude Prompting Best Practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)*\n\nSources: [1] Claude Prompting Best Practices",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/control-output-format",
+      "citations": [
+        {
+          "title": "Claude Prompting Best Practices",
+          "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+          "snippet": "For API parameter changes when migrating from Claude Opus 4.6 (effort levels, task budgets, thinking configuration, samp..."
+        }
+      ]
+    }
+  ]
+}
