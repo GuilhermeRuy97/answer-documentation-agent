@@ -10,7 +10,7 @@ Requirements:
 - Import: retrieval.vector_store (similarity_search), ingestion.embedder (embed_query)
 - Import: os, logging, List, Dict, Any
 
-- Load RETRIEVAL_TOP_K (default 5) and RELEVANCE_THRESHOLD (default 0.70) from env
+- Load RETRIEVAL_TOP_K (default 6) and RELEVANCE_THRESHOLD (default 0.65) from env
 
 - Define one function:
 

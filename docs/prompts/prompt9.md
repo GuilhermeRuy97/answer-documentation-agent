@@ -11,12 +11,12 @@ Requirements:
 
 TOOL 1: search_docs
   @tool
-  def search_docs(query: str, k: int = 5) -> List[Dict]:
+  def search_docs(query: str, k: int = 6) -> List[Dict]:
     \"\"\"Search the Anthropic prompt engineering docs for relevant content.
     Use this when you need to find information about prompt engineering techniques.
     Args:
       query: The search query string
-      k: Number of results to return (default 5)
+      k: Number of results to return (default 6)
     \"\"\"
     - Calls retrieve(query, k=k)
     - Returns the list of chunk dicts directly
