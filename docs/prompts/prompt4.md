@@ -22,8 +22,8 @@ Requirements:
 
   def similarity_search(
       query_embedding: List[float],
-      k: int = 5,
-      threshold: float = 0.70
+      k: int = 6,
+      threshold: float = 0.65
   ) -> List[Dict[str, Any]]:
     - Calls supabase_client.rpc("match_docs", {
         "query_embedding": query_embedding,

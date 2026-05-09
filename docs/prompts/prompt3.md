@@ -8,7 +8,7 @@ This module splits crawled pages into overlapping chunks, preserving source meta
 
 Requirements:
 - Import: langchain_text_splitters.RecursiveCharacterTextSplitter, os, logging, List, Dict, Any
-- Load CHUNK_SIZE (default 800) and CHUNK_OVERLAP (default 100) from environment as ints
+- Load CHUNK_SIZE (default 1200) and CHUNK_OVERLAP (default 200) from environment as ints
 
 - Define one function:
 
