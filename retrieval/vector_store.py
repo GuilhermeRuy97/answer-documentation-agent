@@ -23,7 +23,9 @@ def upsert_chunks(chunks: List[Dict[str, Any]]) -> int:
     count = 0
     for i in range(0, len(chunks), _UPSERT_BATCH_SIZE):
         batch = chunks[i : i + _UPSERT_BATCH_SIZE]
-        supabase_client.table("docs_chunks").upsert(batch).execute()
+        supabase_client.table("docs_chunks").upsert(
+            batch, on_conflict="source_url,chunk_index"
+        ).execute()
         count += len(batch)
     logger.info(f"Upserted {count} chunks to Supabase")
     return count
