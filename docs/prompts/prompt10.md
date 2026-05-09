@@ -17,7 +17,7 @@ Requirements:
 
 NODE 1: rewrite_query(state: AgentState) -> dict
   - Takes state["query"] and state["messages"] (history context)
-  - Calls Claude claude-sonnet-4-5 with a prompt like:
+  - Calls Claude claude-sonnet-4-6 with a prompt like:
     "Given this question: {query}
      Generate 2 alternative phrasings that might retrieve better results
      from a vector database of prompt engineering documentation.
@@ -37,7 +37,7 @@ NODE 2: grade_relevance(state: AgentState) -> dict
 NODE 3: generate_answer(state: AgentState) -> dict
   - Builds context string from state["retrieved_chunks"]:
     Each chunk: "SOURCE: {source_url}\\nCONTENT: {content}\\n---"
-  - Calls Claude claude-sonnet-4-5 with system + user message:
+  - Calls Claude claude-sonnet-4-6 with system + user message:
     System: "You are an expert on Anthropic prompt engineering. Answer questions
              ONLY using the provided documentation context. Be specific and cite sources."
     User: f"Context:\\n{context}\\n\\nQuestion: {state['query']}"
