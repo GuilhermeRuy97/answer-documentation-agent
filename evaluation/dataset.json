@@ -1,0 +1,97 @@
+{
+    "_comment": "15 Q&A pairs over docs.anthropic.com/en/docs/build-with-claude/prompt-engineering. Fill in 'answer' and 'source_url' after running ingestion. These are your ground truth for LangSmith evaluation.",
+    "dataset_name": "anthropic-prompt-engineering-eval-v1",
+    "questions": [
+      {
+        "id": "q01",
+        "question": "What are XML tags used for in Claude prompts and why are they recommended?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags"
+      },
+      {
+        "id": "q02",
+        "question": "How does chain-of-thought prompting improve Claude's reasoning?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought"
+      },
+      {
+        "id": "q03",
+        "question": "What is the recommended structure for a system prompt in Claude?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts"
+      },
+      {
+        "id": "q04",
+        "question": "How do few-shot examples help Claude produce better outputs?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/few-shot-prompting"
+      },
+      {
+        "id": "q05",
+        "question": "What is prompt chaining and when should you use it?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts"
+      },
+      {
+        "id": "q06",
+        "question": "What is prefilling in Claude prompts and what is it useful for?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response"
+      },
+      {
+        "id": "q07",
+        "question": "How should long documents be positioned in a Claude prompt for best results?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips"
+      },
+      {
+        "id": "q08",
+        "question": "What does it mean to give Claude a role and how does it affect responses?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts"
+      },
+      {
+        "id": "q09",
+        "question": "How can you reduce hallucinations when asking Claude factual questions?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/reduce-hallucinations"
+      },
+      {
+        "id": "q10",
+        "question": "What is the difference between zero-shot and few-shot prompting?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/few-shot-prompting"
+      },
+      {
+        "id": "q11",
+        "question": "How do you ask Claude to output data in JSON format reliably?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/control-output-format"
+      },
+      {
+        "id": "q12",
+        "question": "What is the recommended way to iterate and improve a prompt that is not working?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-iteration"
+      },
+      {
+        "id": "q13",
+        "question": "How should you handle tasks that require Claude to say it does not know the answer?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/reduce-hallucinations"
+      },
+      {
+        "id": "q14",
+        "question": "What are the benefits of breaking a complex task into subtasks using prompt chaining?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts"
+      },
+      {
+        "id": "q15",
+        "question": "How does giving Claude explicit instructions about output length affect the response?",
+        "answer": "FILL_IN_AFTER_INGESTION",
+        "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/control-output-format"
+      }
+    ]
+  }
+  
