@@ -274,26 +274,22 @@ Results appear in LangSmith dashboard under project `anthropic-rag-agent`.
 ## 13. How to Run (Full Setup)
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+# 1. Install uv (if not installed)
+# https://docs.astral.sh/uv/getting-started/installation/
 
-# 2. Copy and fill env
-cp .env.example .env
+# 2. Install dependencies
+uv sync
 
-# 3. Run Supabase SQL setup (paste into Supabase SQL editor)
-# scripts/setup_supabase.sql
+# 3. Run ingestion
+uv run python scripts/ingest.py
 
-# 4. Ingest the docs (run once)
-python scripts/ingest.py
+# 4. Start API
+uv run uvicorn api.main:app --reload --port 8000
 
-# 5. Start the API
-uvicorn api.main:app --reload --port 8000
-
-# 6. Test it
-curl -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What are XML tags used for in Claude prompts?"}'
-
-# 7. Run evaluation
-python evaluation/run_eval.py
+# 5. Run evaluation
+uv run python evaluation/run_eval.py
 ```
+
+# Important
+
+- Make real tests to check if the implementation is correct and the code is working as expected.

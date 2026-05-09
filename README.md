@@ -47,7 +47,7 @@ User → FastAPI POST /ask → LangGraph Agent
 
 ### 1. Install dependencies
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 2. Configure environment
@@ -62,12 +62,12 @@ cp .env.example .env
 
 ### 4. Ingest documentation
 ```bash
-python scripts/ingest.py
+uv run python scripts/ingest.py
 ```
 
 ### 5. Start the API
 ```bash
-uvicorn api.main:app --reload --port 8000
+uv run uvicorn api.main:app --reload --port 8000
 ```
 
 ### 6. Query the agent
@@ -82,7 +82,7 @@ curl -X POST http://localhost:8000/ask \
 Fill in the `answer` fields in `evaluation/dataset.json` after ingestion, then:
 
 ```bash
-python evaluation/run_eval.py
+uv run python evaluation/run_eval.py
 ```
 
 Results appear in the terminal and in your LangSmith dashboard.
