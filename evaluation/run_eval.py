@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 def load_dataset(path: str = "evaluation/dataset.json") -> List[dict]:
     with open(path) as f:
-        entries = json.load(f)
+        data = json.load(f)
 
+    entries = data["questions"] if isinstance(data, dict) else data
     valid = []
     for entry in entries:
         if entry.get("answer") == "FILL_IN_AFTER_INGESTION":
