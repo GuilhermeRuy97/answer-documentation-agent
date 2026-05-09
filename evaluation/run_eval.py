@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import statistics
-import time
 from typing import List
 
 from dotenv import load_dotenv

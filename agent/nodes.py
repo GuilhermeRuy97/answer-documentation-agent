@@ -6,7 +6,6 @@ import anthropic
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.state import AgentState
-from retrieval.retriever import retrieve
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ def grade_relevance(state: AgentState) -> dict:
 
     mean_score = sum(c["similarity"] for c in chunks) / len(chunks)
     logger.info(f"Relevance score: {mean_score:.3f} from {len(chunks)} chunks")
-    return {"relevance_score": mean_score}
+    return {"relevance_score": mean_score, "retry_count": state["retry_count"] + 1}
 
 
 def generate_answer(state: AgentState) -> dict:
