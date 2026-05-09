@@ -26,7 +26,13 @@ ON docs_chunks
 USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
--- Step 4: Index on source_url for deduplication queries during ingestion
+-- Step 4: Unique constraint to prevent duplicate chunks on re-ingestion
+ALTER TABLE docs_chunks
+    DROP CONSTRAINT IF EXISTS docs_chunks_source_url_chunk_index_key;
+ALTER TABLE docs_chunks
+    ADD CONSTRAINT docs_chunks_source_url_chunk_index_key
+    UNIQUE (source_url, chunk_index);
+
 CREATE INDEX IF NOT EXISTS docs_chunks_source_url_idx
 ON docs_chunks (source_url);
 
