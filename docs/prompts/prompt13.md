@@ -28,7 +28,7 @@ Requirements:
 - class HealthResponse(BaseModel):
     status: str
     vector_store: str
-    model: str = "claude-sonnet-4-5"
+    model: str = "claude-sonnet-4-6"
 
 - class HistoryMessage(BaseModel):
     role: str  # "human" or "ai"
