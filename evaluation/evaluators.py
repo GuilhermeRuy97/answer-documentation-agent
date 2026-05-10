@@ -46,7 +46,6 @@ def _judge(prompt: str) -> int:
     response = _client.messages.create(
         model=_MODEL,
         max_tokens=256,
-        temperature=0,
         messages=[{"role": "user", "content": prompt}],
     )
     return _parse_score(response.content[0].text)
@@ -110,3 +109,29 @@ def run_single_evaluation(question: str, agent_output: dict) -> dict:
         "faithfulness": faithfulness_evaluator(answer, context),
         "citation_quality": citation_quality_evaluator(final_response, citations),
     }
+
+
+# LangSmith-compatible evaluators for use with langsmith.evaluate().
+# Signature: (inputs, outputs) -> {"key": str, "score": int}
+
+def ls_relevance(inputs: dict, outputs: dict) -> dict:
+    question = inputs.get("question", "")
+    chunks = outputs.get("retrieved_chunks", [])
+    context = "\n---\n".join(c.get("content", "") for c in chunks)
+    score = relevance_evaluator(question, context)
+    return {"key": "relevance", "score": score}
+
+
+def ls_faithfulness(inputs: dict, outputs: dict) -> dict:
+    chunks = outputs.get("retrieved_chunks", [])
+    context = "\n---\n".join(c.get("content", "") for c in chunks)
+    answer = outputs.get("answer", "")
+    score = faithfulness_evaluator(answer, context)
+    return {"key": "faithfulness", "score": score}
+
+
+def ls_citation_quality(inputs: dict, outputs: dict) -> dict:
+    final_response = outputs.get("final_response", outputs.get("answer", ""))
+    citations = outputs.get("citations", [])
+    score = citation_quality_evaluator(final_response, citations)
+    return {"key": "citation_quality", "score": score}
