@@ -102,3 +102,14 @@ Results appear in the terminal and in your LangSmith dashboard.
 - **Streaming**: FastAPI SSE for real-time token streaming
 - **Option C**: MCP server exposing `search_docs` as an MCP tool for Claude Code/Desktop
 - **Hybrid search**: Combine PGVector similarity with BM25 full-text search for better recall
+
+## First Test Results
+
+┌─────────────────────┬───────┐
+│ Metric              │ Score │
+├─────────────────────┼───────┤
+│ Relevance           │ 3.7/5 │
+│ Faithfulness        │ 4.8/5 │
+│ Citation Quality    │ 4.2/5 │
+│ Overall             │ 4.2/5 │
+└─────────────────────┴───────┘
