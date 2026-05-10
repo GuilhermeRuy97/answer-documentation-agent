@@ -1,35 +1,47 @@
 import os
+import re
 
 from langgraph.graph import END, StateGraph
 
 from agent.nodes import generate_answer, grade_relevance, rewrite_query
 from agent.state import AgentState
+from retrieval.reranker import rerank
 from retrieval.retriever import retrieve
 
-RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.65"))
+RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.45"))
 MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", "2"))
+RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "6"))
+RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", "6"))
+RECALL_THRESHOLD = float(os.getenv("RECALL_THRESHOLD", "0.30"))
 
 
 def search_docs_node(state: AgentState) -> dict:
-    queries = state.get("rewritten_queries", [state["query"]])
+    """Search across ALL query variants in parallel, union, then rerank against original question."""
+    original_query = state["query"]
+    variants = state.get("rewritten_queries", [original_query])
     retry_count = state.get("retry_count", 0)
 
-    if retry_count == 0:
-        selected = queries[:1]
-    else:
-        idx = min(retry_count, len(queries) - 1)
-        selected = queries[idx : idx + 1]
+    # Always include the original question; deduplicate while preserving order
+    all_queries = list(dict.fromkeys([original_query] + variants))
 
-    seen_urls: set = set()
-    merged: list = []
-    for q in selected:
-        for chunk in retrieve(q):
-            url = chunk.get("source_url", "")
-            if url not in seen_urls:
-                seen_urls.add(url)
-                merged.append(chunk)
+    # On retry, lower the recall floor and pull wider per variant; rerank narrows down later
+    recall_threshold = max(0.15, RECALL_THRESHOLD - 0.05 * retry_count)
+    per_variant_k = RETRIEVAL_TOP_K * 2 * (retry_count + 1)
 
-    return {"retrieved_chunks": merged, "retry_count": retry_count}
+    seen_keys: set = set()
+    candidates: list = []
+    for q in all_queries:
+        for chunk in retrieve(q, k=per_variant_k, threshold=recall_threshold):
+            key = (chunk.get("source_url", ""), chunk.get("chunk_index"), chunk.get("id"))
+            if key not in seen_keys:
+                seen_keys.add(key)
+                candidates.append(chunk)
+
+    # Rerank against the original user question (not the hypothetical answers)
+    if candidates:
+        candidates = rerank(original_query, candidates, top_k=RERANK_TOP_K)
+
+    return {"retrieved_chunks": candidates, "retry_count": retry_count}
 
 
 def should_retry(state: AgentState) -> str:
@@ -39,16 +51,31 @@ def should_retry(state: AgentState) -> str:
 
 
 def format_citations_node(state: AgentState) -> dict:
+    """Build the citation list from [N] markers Claude used, deduping by URL.
+
+    Rewrites the answer so visible markers map 1:1 to the citation list. If two chunks
+    share a source URL, both [3] and [5] (say) collapse to the same citation number.
+    """
     answer = state.get("answer", "")
     chunks = state.get("retrieved_chunks", [])
 
-    seen_urls: set = set()
+    used_indexes = sorted({int(n) for n in re.findall(r"\[(\d+)\]", answer)})
+
     citations: list = []
-    for chunk in chunks:
-        url = chunk.get("source_url", "")
-        if url in seen_urls:
+    url_to_seq: dict = {}
+    n_to_seq: dict = {}
+
+    for n in used_indexes:
+        if not (1 <= n <= len(chunks)):
             continue
-        seen_urls.add(url)
+        chunk = chunks[n - 1]
+        url = chunk.get("source_url", "")
+        if url in url_to_seq:
+            n_to_seq[n] = url_to_seq[url]
+            continue
+        seq = len(citations) + 1
+        url_to_seq[url] = seq
+        n_to_seq[n] = seq
         snippet = chunk.get("content", "")[:120].strip() + "..."
         citations.append({
             "title": chunk.get("page_title", "Untitled"),
@@ -56,10 +83,29 @@ def format_citations_node(state: AgentState) -> dict:
             "snippet": snippet,
         })
 
-    source_lines = ", ".join(f"[{i + 1}] {c['title']}" for i, c in enumerate(citations))
-    formatted_answer = answer + (f"\n\nSources: {source_lines}" if citations else "")
+    def _remap(match: "re.Match") -> str:
+        original = int(match.group(1))
+        if original in n_to_seq:
+            return f"[{n_to_seq[original]}]"
+        return ""  # drop invalid markers Claude may have hallucinated
 
-    return {"citations": citations, "final_response": formatted_answer}
+    final_answer = re.sub(r"\[(\d+)\]", _remap, answer)
+
+    # Fallback: if Claude didn't use any markers but we have chunks, surface top sources
+    if not citations and chunks:
+        for chunk in chunks[:3]:
+            url = chunk.get("source_url", "")
+            if url in url_to_seq:
+                continue
+            url_to_seq[url] = len(citations) + 1
+            snippet = chunk.get("content", "")[:120].strip() + "..."
+            citations.append({
+                "title": chunk.get("page_title", "Untitled"),
+                "url": url,
+                "snippet": snippet,
+            })
+
+    return {"citations": citations, "final_response": final_answer}
 
 
 def build_graph():
