@@ -56,6 +56,7 @@ def rewrite_query(state: AgentState) -> dict:
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
+            temperature=0.7,
             messages=[{"role": "user", "content": prompt}],
         )
         variants = json.loads(_strip_json_fence(response.content[0].text))
@@ -96,7 +97,8 @@ def generate_answer(state: AgentState) -> dict:
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1024,
+        max_tokens=2048,
+        temperature=0.2,
         system=(
             "You are an expert on Anthropic prompt engineering. Answer questions ONLY using "
             "the provided documentation context. Be specific.\n\n"
