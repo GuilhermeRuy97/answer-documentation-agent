@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 DOCS_URL = os.getenv(
     "DOCS_URL",
-    "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering",
+    "https://platform.claude.com/docs/en/build-with-claude",
 )
-CRAWL_LIMIT = int(os.getenv("CRAWL_LIMIT", "40"))
+CRAWL_LIMIT = int(os.getenv("CRAWL_LIMIT", "80"))
 CACHE_PATH = os.getenv("CACHE_PATH", "data/crawl_cache.json")
 
 
