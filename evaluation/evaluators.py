@@ -46,6 +46,7 @@ def _judge(prompt: str) -> int:
     response = _client.messages.create(
         model=_MODEL,
         max_tokens=256,
+        temperature=0,
         messages=[{"role": "user", "content": prompt}],
     )
     return _parse_score(response.content[0].text)
