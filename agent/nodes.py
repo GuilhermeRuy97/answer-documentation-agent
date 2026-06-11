@@ -8,9 +8,8 @@ the request. The Anthropic client is lazy so the module imports without keys.
 import json
 import logging
 import time
-from typing import List, Optional
+from typing import List
 
-import anthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from agent import session as session_store
@@ -24,32 +23,10 @@ from agent.prompts import (
     build_summary_prompt,
 )
 from agent.state import AgentState
+from core.clients import get_anthropic_client
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-_client: Optional[anthropic.Anthropic] = None
-
-
-def get_anthropic_client() -> anthropic.Anthropic:
-    """Return the lazily-initialized Anthropic client.
-
-    Returns:
-        The shared Anthropic client.
-
-    Raises:
-        RuntimeError: If ANTHROPIC_API_KEY is not configured.
-    """
-    global _client
-    if _client is not None:
-        return _client
-
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY must be set to call Claude")
-
-    _client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    return _client
 
 
 def _call_claude(

@@ -20,8 +20,9 @@ def retrieve(query: str, k: int | None = None, threshold: float | None = None) -
     Args:
         query: Natural-language query (or HyDE paragraph).
         k: Max chunks to return; defaults to Settings.retrieval_top_k.
-        threshold: Cosine recall floor for the pure-vector path;
-            defaults to Settings.recall_threshold. Ignored by hybrid RRF.
+        threshold: Cosine recall floor for the pure-vector path and the
+            hybrid fallback; defaults to Settings.recall_threshold. The
+            hybrid RRF ranking itself has no score floor and widens via k.
 
     Returns:
         Ranked chunk dicts; empty list when nothing matches.
@@ -33,7 +34,7 @@ def retrieve(query: str, k: int | None = None, threshold: float | None = None) -
     embedding = embed_query(query)
 
     if settings.use_hybrid_search:
-        results = hybrid_search(embedding, query, k=k)
+        results = hybrid_search(embedding, query, k=k, threshold=threshold)
     else:
         results = similarity_search(embedding, k=k, threshold=threshold)
 

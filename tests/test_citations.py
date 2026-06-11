@@ -44,4 +44,11 @@ class TestBuildCitations:
     def test_snippet_truncated(self):
         chunks = [_chunk("https://a.com", content="x" * 500)]
         result = build_citations("Fact [1]", chunks)
-        assert len(result["citations"][0]["snippet"]) <= 124
+        snippet = result["citations"][0]["snippet"]
+        assert len(snippet) <= 124
+        assert snippet.endswith("...")
+
+    def test_snippet_short_content_has_no_ellipsis(self):
+        chunks = [_chunk("https://a.com", content="Short content.")]
+        result = build_citations("Fact [1]", chunks)
+        assert result["citations"][0]["snippet"] == "Short content."

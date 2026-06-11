@@ -158,6 +158,7 @@ def hybrid_search(
     query_embedding: List[float],
     query_text: str,
     k: int = 6,
+    threshold: float | None = None,
 ) -> List[Dict[str, Any]]:
     """Hybrid vector + full-text search fused with Reciprocal Rank Fusion.
 
@@ -168,6 +169,8 @@ def hybrid_search(
         query_embedding: 1024-dim query embedding.
         query_text: Raw query text for the full-text leg.
         k: Max rows to return.
+        threshold: Cosine recall floor for the vector fallback (RRF itself
+            has no score floor); defaults to Settings.recall_threshold.
 
     Returns:
         Chunk dicts with id, content, source_url, page_title, chunk_index,
@@ -189,7 +192,9 @@ def hybrid_search(
         return result.data
     except Exception:
         logger.warning("hybrid_match_docs RPC failed (migration applied?); falling back to vector search")
-        return similarity_search(query_embedding, k=k, threshold=settings.recall_threshold)
+        if threshold is None:
+            threshold = settings.recall_threshold
+        return similarity_search(query_embedding, k=k, threshold=threshold)
 
 
 def health_check() -> bool:

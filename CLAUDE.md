@@ -77,6 +77,7 @@ Key tunables and their defaults: `CHUNK_SIZE=1200`, `CHUNK_OVERLAP=200`,
 | File | Responsibility |
 |---|---|
 | `config.py` | pydantic-settings `Settings` + cached `get_settings()`. Single source for all env vars |
+| `clients.py` | Shared lazy `get_anthropic_client()` used by agent nodes and evaluators |
 | `logging.py` | `setup_logging()` used by all entry points |
 
 ### `ingestion/`
@@ -100,11 +101,11 @@ Key tunables and their defaults: `CHUNK_SIZE=1200`, `CHUNK_OVERLAP=200`,
 |---|---|
 | `state.py` | `AgentState` TypedDict (includes `summary`, `error`) |
 | `prompts.py` | ALL runtime prompts: XML-tagged, few-shot, prefill constants |
-| `nodes.py` | `load_memory`, `rewrite_query`, `grade_relevance`, `generate_answer`, `save_memory`; lazy Anthropic client; per-call latency/token logging |
+| `nodes.py` | `load_memory`, `rewrite_query`, `grade_relevance`, `generate_answer`, `save_memory`; Claude calls via `core.clients`; per-call latency/token logging |
 | `citations.py` | `build_citations()` shared by graph node and tool |
 | `tools.py` | Thin LangChain tool wrappers over retriever + citations |
 | `graph.py` | `search_docs_node`, `should_retry`, `format_citations_node`, `build_graph()` |
-| `session.py` | Two-tier memory: TTL in-memory cache + Supabase `chat_messages`/`chat_sessions`. `get_history`, `get_summary`, `append_messages`, `save_summary`, `trim_history`, `clear_history` |
+| `session.py` | Two-tier memory: TTL in-memory cache + Supabase `chat_messages`/`chat_sessions`. `get_history`, `get_summary`, `append_messages`, `save_summary`, `trim_history`, `clear_history`. DB reload is bounded to the last `MAX_HISTORY_MESSAGES` (older turns live in the summary) |
 
 ### `api/`
 | File | Responsibility |
@@ -180,7 +181,9 @@ With `MAX_RETRY_COUNT=2`: at most 3 searches (1 initial + 2 retries).
 1. Each query variant → `hybrid_match_docs` RPC (vector + full-text, RRF in SQL).
 2. Variant result lists fused in Python via `reciprocal_rank_fusion()`.
 3. Voyage `rerank-2` reranks fused candidates against the ORIGINAL question.
-4. On retry: recall floor drops 0.05/attempt, per-variant k doubles.
+4. On retry: per-variant k doubles and the recall floor drops 0.05/attempt
+   (the floor applies to pure-vector search and the hybrid fallback; the
+   hybrid RRF ranking itself has no score floor and widens through k).
 
 ---
 

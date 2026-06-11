@@ -18,6 +18,7 @@ def safe_settings():
 
     settings.persist_sessions = False
     settings.api_keys = ""
+    settings.langchain_api_key = ""
     settings.session_ttl_seconds = 3600
     settings.max_history_messages = 12
 

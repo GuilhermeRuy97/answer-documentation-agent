@@ -30,8 +30,10 @@ logger = logging.getLogger(__name__)
 def search_docs_node(state: AgentState) -> dict:
     """Search all query variants, fuse with RRF, then rerank against the question.
 
-    On retries the recall floor drops and per-variant breadth widens so the
-    reranker has more candidates to work with.
+    On retries the per-variant breadth (k) widens and the cosine recall floor
+    drops, so the reranker has more candidates to work with. The recall floor
+    applies to the pure-vector path and the hybrid fallback; the hybrid RRF
+    ranking itself widens through k only.
 
     Args:
         state: Current agent state.

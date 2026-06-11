@@ -132,8 +132,8 @@ class TestHealth:
 
 
 class TestFeedback:
-    def test_feedback_logged_locally_without_langsmith(self, client, monkeypatch):
-        monkeypatch.delenv("LANGCHAIN_API_KEY", raising=False)
+    def test_feedback_logged_locally_without_langsmith(self, client, safe_settings):
+        safe_settings.langchain_api_key = ""
         resp = client.post("/feedback", json={"trace_id": "abc-123", "score": 1.0})
         assert resp.status_code == 200
         assert resp.json()["status"] == "logged_locally"

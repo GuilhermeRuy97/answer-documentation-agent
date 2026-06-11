@@ -9,35 +9,12 @@ Each judge metric is scored 1-5; hit rate is 0/1.
 import json
 import logging
 import re
-from typing import Optional
 from urllib.parse import urlparse
 
-import anthropic
-
+from core.clients import get_anthropic_client
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-_client: Optional[anthropic.Anthropic] = None
-
-
-def _get_client() -> anthropic.Anthropic:
-    """Return the lazily-initialized judge client.
-
-    Returns:
-        Anthropic client for evaluation calls.
-
-    Raises:
-        RuntimeError: If ANTHROPIC_API_KEY is not configured.
-    """
-    global _client
-    if _client is not None:
-        return _client
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY must be set to run evaluators")
-    _client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    return _client
 
 
 def _parse_score(raw: str) -> int:
@@ -86,7 +63,7 @@ def _judge(prompt: str) -> int:
     Returns:
         Integer score 1-5.
     """
-    response = _get_client().messages.create(
+    response = get_anthropic_client().messages.create(
         model=get_settings().judge_model,
         max_tokens=256,
         messages=[

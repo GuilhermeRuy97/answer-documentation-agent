@@ -3,6 +3,23 @@
 import re
 from typing import Any, Dict, List
 
+_SNIPPET_MAX_CHARS = 120
+
+
+def _snippet(content: str) -> str:
+    """Build a short citation preview, with an ellipsis only when truncated.
+
+    Args:
+        content: Full chunk content.
+
+    Returns:
+        Preview string of at most _SNIPPET_MAX_CHARS characters (plus "...").
+    """
+    snippet = content[:_SNIPPET_MAX_CHARS].strip()
+    if len(content) > _SNIPPET_MAX_CHARS:
+        snippet += "..."
+    return snippet
+
 
 def build_citations(answer: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Build the citation list from [N] markers in the answer, deduped by URL.
@@ -36,11 +53,10 @@ def build_citations(answer: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]
         seq = len(citations) + 1
         url_to_seq[url] = seq
         n_to_seq[n] = seq
-        snippet = chunk.get("content", "")[:120].strip() + "..."
         citations.append({
             "title": chunk.get("page_title", "Untitled"),
             "url": url,
-            "snippet": snippet,
+            "snippet": _snippet(chunk.get("content", "")),
         })
 
     def _remap(match: "re.Match") -> str:
@@ -57,11 +73,10 @@ def build_citations(answer: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]
             if url in url_to_seq:
                 continue
             url_to_seq[url] = len(citations) + 1
-            snippet = chunk.get("content", "")[:120].strip() + "..."
             citations.append({
                 "title": chunk.get("page_title", "Untitled"),
                 "url": url,
-                "snippet": snippet,
+                "snippet": _snippet(chunk.get("content", "")),
             })
 
     return {"final_response": final_answer, "citations": citations}

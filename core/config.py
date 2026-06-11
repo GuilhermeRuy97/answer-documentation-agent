@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
     firecrawl_api_key: str = ""
+    langchain_api_key: str = ""
     langchain_project: str = "anthropic-rag-agent"
 
     # --- Models ---

@@ -1,7 +1,6 @@
 """API route handlers."""
 
 import logging
-import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -45,7 +44,8 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
         Answer with citations, session id, query variants, and trace id.
     """
     settings = get_settings()
-    session_id = get_or_create_session(body.session_id)
+    # Session resolution can hit Supabase on a cache miss; keep it off the event loop.
+    session_id = await run_in_threadpool(get_or_create_session, body.session_id)
     run_id = uuid.uuid4()
 
     initial_state = {
@@ -115,7 +115,7 @@ async def get_session_history(session_id: str) -> HistoryResponse:
     Raises:
         HTTPException: 404 when the session has no messages.
     """
-    history = get_history(session_id)
+    history = await run_in_threadpool(get_history, session_id)
     if not history:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -159,7 +159,7 @@ async def submit_feedback(body: FeedbackRequest) -> FeedbackResponse:
     Returns:
         Status payload.
     """
-    if not os.getenv("LANGCHAIN_API_KEY"):
+    if not get_settings().langchain_api_key:
         logger.info(f"Feedback (local only): trace={body.trace_id} score={body.score} comment={body.comment}")
         return FeedbackResponse(status="logged_locally")
 

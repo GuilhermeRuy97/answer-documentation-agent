@@ -4,6 +4,7 @@ assistant-prefill for structured outputs, and prompt-injection hardening.
 """
 
 from typing import Any, Dict, List
+from xml.sax.saxutils import escape, quoteattr
 
 # ---------------------------------------------------------------------------
 # Query rewriting (HyDE + keyword variant)
@@ -42,7 +43,7 @@ def build_rewrite_prompt(query: str, history_text: str, summary: str) -> str:
     if history_text:
         context_blocks += f"<recent_conversation>\n{history_text}\n</recent_conversation>\n"
 
-    return f"""{context_blocks}<question>{query}</question>
+    return f"""{context_blocks}<question>{escape(query)}</question>
 
 Write search queries for the question above:
 1. "hyde": 2 short hypothetical paragraphs (3-5 sentences each) that would directly answer the question, written in the style of Anthropic's prompt engineering documentation. Phrase them as concrete factual statements - they are embedded and matched against real documentation chunks.
@@ -93,11 +94,15 @@ def build_answer_prompt(query: str, chunks: List[Dict[str, Any]], summary: str) 
         XML-structured user prompt.
     """
     if chunks:
+        # Escape chunk fields so literal XML in the docs (the corpus teaches
+        # XML-tag prompting) cannot break the document boundaries that the
+        # citation [N] markers rely on.
         doc_parts = []
         for i, c in enumerate(chunks, start=1):
             doc_parts.append(
-                f'<document index="{i}" url="{c.get("source_url", "")}" title="{c.get("page_title", "Untitled")}">\n'
-                f"{c.get('content', '')}\n"
+                f'<document index="{i}" url={quoteattr(c.get("source_url", ""))} '
+                f'title={quoteattr(c.get("page_title", "Untitled"))}>\n'
+                f"{escape(c.get('content', ''))}\n"
                 f"</document>"
             )
         documents = "\n".join(doc_parts)
@@ -112,7 +117,7 @@ def build_answer_prompt(query: str, chunks: List[Dict[str, Any]], summary: str) 
 {documents}
 </documents>
 
-<question>{query}</question>"""
+<question>{escape(query)}</question>"""
 
 
 # ---------------------------------------------------------------------------

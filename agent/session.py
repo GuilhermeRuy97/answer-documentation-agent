@@ -52,7 +52,11 @@ def _evict_expired() -> None:
 
 
 def _load_from_db(session_id: str) -> Optional[_SessionEntry]:
-    """Load a session's messages and summary from Supabase.
+    """Load a session's summary and most recent messages from Supabase.
+
+    Only the last max_history_messages rows are loaded: older turns are
+    already covered by the rolling summary, and reloading the full transcript
+    after a TTL eviction would re-trigger summarization of the same turns.
 
     Args:
         session_id: Session to load.
@@ -70,11 +74,12 @@ def _load_from_db(session_id: str) -> Optional[_SessionEntry]:
             client.table("chat_messages")
             .select("role, content")
             .eq("session_id", session_id)
-            .order("id")
+            .order("id", desc=True)
+            .limit(get_settings().max_history_messages)
             .execute()
         )
         messages: List[BaseMessage] = []
-        for row in msg_result.data or []:
+        for row in reversed(msg_result.data or []):
             if row["role"] == "human":
                 messages.append(HumanMessage(content=row["content"]))
             else:
@@ -123,8 +128,13 @@ def get_or_create_session(session_id: str | None = None) -> str:
     Returns:
         The resolved session id.
     """
-    session_id = session_id or str(uuid.uuid4())
-    _ensure(session_id)
+    if not session_id:
+        # A freshly generated UUID cannot exist in the DB; skip the load.
+        session_id = str(uuid.uuid4())
+        _evict_expired()
+        _cache[session_id] = _SessionEntry()
+    else:
+        _ensure(session_id)
     return session_id
 
 

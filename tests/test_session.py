@@ -55,6 +55,86 @@ class TestSessionLifecycle:
         assert session_store.clear_history("does-not-exist") is False
 
 
+class _FakeResult:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeQuery:
+    """Minimal chainable stand-in for a supabase table query."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self._desc = False
+        self._limit = None
+
+    def select(self, *args, **kwargs):
+        return self
+
+    def eq(self, *args, **kwargs):
+        return self
+
+    def order(self, column, desc=False):
+        self._desc = desc
+        return self
+
+    def limit(self, n):
+        self._limit = n
+        return self
+
+    def execute(self):
+        rows = list(self._rows)
+        if self._desc:
+            rows = rows[::-1]
+        if self._limit is not None:
+            rows = rows[: self._limit]
+        return _FakeResult(rows)
+
+
+class _FakeClient:
+    def __init__(self, messages, sessions):
+        self._tables = {"chat_messages": messages, "chat_sessions": sessions}
+
+    def table(self, name):
+        return _FakeQuery(self._tables[name])
+
+
+class TestDbReload:
+    def test_load_from_db_is_bounded_and_chronological(self, safe_settings, monkeypatch):
+        """After a TTL eviction, only the last max_history_messages turns are
+        reloaded; older turns stay summarized instead of re-entering context."""
+        safe_settings.persist_sessions = True
+        safe_settings.supabase_url = "http://localhost"
+        safe_settings.supabase_service_key = "key"
+        safe_settings.max_history_messages = 4
+
+        rows = [{"role": "human", "content": str(i)} for i in range(10)]
+        fake = _FakeClient(messages=rows, sessions=[{"summary": "older turns summarized"}])
+
+        import retrieval.vector_store as vector_store_module
+
+        monkeypatch.setattr(vector_store_module, "get_client", lambda: fake)
+
+        entry = session_store._load_from_db("evicted-session")
+        assert entry is not None
+        assert [m.content for m in entry.messages] == ["6", "7", "8", "9"]
+        assert entry.summary == "older turns summarized"
+
+    def test_new_session_skips_db_probe(self, monkeypatch):
+        def _fail(session_id):
+            raise AssertionError("fresh UUIDs must not be probed in the DB")
+
+        monkeypatch.setattr(session_store, "_load_from_db", _fail)
+        sid = session_store.get_or_create_session(None)
+        assert sid in session_store._cache
+
+    def test_provided_session_id_still_loads_from_db(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(session_store, "_load_from_db", lambda sid: calls.append(sid) or None)
+        session_store.get_or_create_session("known-session")
+        assert calls == ["known-session"]
+
+
 class TestTtlEviction:
     def test_idle_sessions_evicted(self, safe_settings):
         safe_settings.session_ttl_seconds = 60
