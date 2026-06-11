@@ -110,8 +110,10 @@ BEGIN
     fused AS (
         SELECT
             COALESCE(v.doc_id, t.doc_id) AS doc_id,
-            COALESCE(1.0 / (rrf_k + v.rank), 0.0)
-              + COALESCE(1.0 / (rrf_k + t.rank), 0.0) AS score
+            -- ::FLOAT casts keep the result double precision; numeric division
+            -- here would 42804 against the declared rrf_score FLOAT column.
+            COALESCE(1.0::FLOAT / (rrf_k + v.rank), 0.0)
+              + COALESCE(1.0::FLOAT / (rrf_k + t.rank), 0.0) AS score
         FROM vector_results v
         FULL OUTER JOIN text_results t ON v.doc_id = t.doc_id
     )
