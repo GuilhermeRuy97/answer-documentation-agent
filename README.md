@@ -47,7 +47,7 @@ User → Chat UI / POST /ask → LangGraph Agent
                     └───────────┬───────────┘
                     ┌───────────▼───────────┐
                     │   rewrite_query        │  Claude: 2 HyDE paragraphs + keyword query
-                    └───────────┬───────────┘  (JSON via assistant prefill)
+                    └───────────┬───────────┘  (JSON via structured outputs)
                     ┌───────────▼───────────┐
                     │   search_docs          │  Hybrid search (vector + full-text, RRF in SQL)
                     └───────────┬───────────┘  per variant → RRF fusion across variants
