@@ -54,8 +54,21 @@ def _parse_score(raw: str) -> int:
     raise ValueError(f"Could not extract score from: {raw[:100]}")
 
 
+# Assistant prefill is not supported on the Claude 4.6+ family; the judge's
+# JSON shape is enforced via structured outputs instead.
+_JUDGE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer", "enum": [1, 2, 3, 4, 5]},
+        "reasoning": {"type": "string"},
+    },
+    "required": ["score"],
+    "additionalProperties": False,
+}
+
+
 def _judge(prompt: str) -> int:
-    """Run one judge call with the JSON-object prefill and parse the score.
+    """Run one judge call with a JSON-schema-constrained output and parse the score.
 
     Args:
         prompt: Judge prompt.
@@ -66,12 +79,10 @@ def _judge(prompt: str) -> int:
     response = get_anthropic_client().messages.create(
         model=get_settings().judge_model,
         max_tokens=256,
-        messages=[
-            {"role": "user", "content": prompt},
-            {"role": "assistant", "content": "{"},
-        ],
+        messages=[{"role": "user", "content": prompt}],
+        output_config={"format": {"type": "json_schema", "schema": _JUDGE_OUTPUT_SCHEMA}},
     )
-    return _parse_score("{" + response.content[0].text)
+    return _parse_score(response.content[0].text)
 
 
 def relevance_evaluator(question: str, context: str) -> int:
