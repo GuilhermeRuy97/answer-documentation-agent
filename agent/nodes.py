@@ -15,7 +15,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from agent import session as session_store
 from agent.prompts import (
     ANSWER_SYSTEM,
-    REWRITE_PREFILL,
+    REWRITE_OUTPUT_SCHEMA,
     REWRITE_SYSTEM,
     SUMMARY_SYSTEM,
     build_answer_prompt,
@@ -34,24 +34,25 @@ def _call_claude(
     user_prompt: str,
     max_tokens: int,
     temperature: float,
-    prefill: str | None = None,
+    output_schema: dict | None = None,
 ) -> str:
-    """Call Claude and return the (prefill-prepended) text, logging usage/latency.
+    """Call Claude and return the generated text, logging usage/latency.
 
     Args:
         system: System prompt.
         user_prompt: User message content.
         max_tokens: Generation cap.
         temperature: Sampling temperature.
-        prefill: Optional assistant-turn prefill for structured output.
+        output_schema: Optional JSON schema; when given, the response is
+            constrained via structured outputs (output_config.format).
 
     Returns:
-        Generated text, including the prefill prefix when provided.
+        Generated text (valid JSON when output_schema is provided).
     """
     settings = get_settings()
-    messages = [{"role": "user", "content": user_prompt}]
-    if prefill:
-        messages.append({"role": "assistant", "content": prefill})
+    kwargs = {}
+    if output_schema is not None:
+        kwargs["output_config"] = {"format": {"type": "json_schema", "schema": output_schema}}
 
     started = time.perf_counter()
     response = get_anthropic_client().messages.create(
@@ -59,15 +60,15 @@ def _call_claude(
         max_tokens=max_tokens,
         temperature=temperature,
         system=system,
-        messages=messages,
+        messages=[{"role": "user", "content": user_prompt}],
+        **kwargs,
     )
     elapsed_ms = (time.perf_counter() - started) * 1000
     usage = response.usage
     logger.info(
         f"Claude call: {elapsed_ms:.0f}ms, in={usage.input_tokens} out={usage.output_tokens} tokens"
     )
-    text = response.content[0].text
-    return (prefill or "") + text
+    return response.content[0].text
 
 
 def _format_turns(messages: List[BaseMessage], limit: int, max_chars: int = 300) -> str:
@@ -131,7 +132,7 @@ def rewrite_query(state: AgentState) -> dict:
             user_prompt=prompt,
             max_tokens=512,
             temperature=0.7,
-            prefill=REWRITE_PREFILL,
+            output_schema=REWRITE_OUTPUT_SCHEMA,
         )
         parsed = json.loads(raw)
         hyde = [v for v in parsed.get("hyde", []) if isinstance(v, str) and v.strip()]
