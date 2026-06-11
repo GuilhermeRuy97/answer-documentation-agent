@@ -219,3 +219,10 @@ __marimo__/
 
 # Others
 data/crawl_cache.json
+evaluation/results_raw.json
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Docs
+docs/

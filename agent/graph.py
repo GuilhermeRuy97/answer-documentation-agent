@@ -1,128 +1,127 @@
-import os
-import re
+"""LangGraph StateGraph assembly.
+
+Flow:
+    load_memory -> rewrite_query -> search_docs -> grade_relevance
+        -> (retry: search_docs | ok: generate_answer)
+        -> format_citations -> save_memory -> END
+"""
+
+import logging
 
 from langgraph.graph import END, StateGraph
 
-from agent.nodes import generate_answer, grade_relevance, rewrite_query
+from agent.citations import build_citations
+from agent.nodes import (
+    generate_answer,
+    grade_relevance,
+    load_memory,
+    rewrite_query,
+    save_memory,
+)
 from agent.state import AgentState
+from core.config import get_settings
+from retrieval.fusion import reciprocal_rank_fusion
 from retrieval.reranker import rerank
 from retrieval.retriever import retrieve
 
-RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.45"))
-MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", "2"))
-RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "6"))
-RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", "6"))
-RECALL_THRESHOLD = float(os.getenv("RECALL_THRESHOLD", "0.30"))
+logger = logging.getLogger(__name__)
 
 
 def search_docs_node(state: AgentState) -> dict:
-    """Search across ALL query variants in parallel, union, then rerank against original question."""
+    """Search all query variants, fuse with RRF, then rerank against the question.
+
+    On retries the recall floor drops and per-variant breadth widens so the
+    reranker has more candidates to work with.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Partial update with retrieved_chunks.
+    """
+    settings = get_settings()
     original_query = state["query"]
     variants = state.get("rewritten_queries", [original_query])
     retry_count = state.get("retry_count", 0)
 
-    # Always include the original question; deduplicate while preserving order
     all_queries = list(dict.fromkeys([original_query] + variants))
 
-    # On retry, lower the recall floor and pull wider per variant; rerank narrows down later
-    recall_threshold = max(0.15, RECALL_THRESHOLD - 0.05 * retry_count)
-    per_variant_k = RETRIEVAL_TOP_K * 2 * (retry_count + 1)
+    recall_threshold = max(0.15, settings.recall_threshold - 0.05 * retry_count)
+    per_variant_k = settings.retrieval_top_k * 2 * (retry_count + 1)
 
-    seen_keys: set = set()
-    candidates: list = []
+    result_lists = []
     for q in all_queries:
-        for chunk in retrieve(q, k=per_variant_k, threshold=recall_threshold):
-            key = (chunk.get("source_url", ""), chunk.get("chunk_index"), chunk.get("id"))
-            if key not in seen_keys:
-                seen_keys.add(key)
-                candidates.append(chunk)
+        results = retrieve(q, k=per_variant_k, threshold=recall_threshold)
+        if results:
+            result_lists.append(results)
 
-    # Rerank against the original user question (not the hypothetical answers)
+    # Fuse rankings across variants: chunks ranked highly by several variants win.
+    candidates = reciprocal_rank_fusion(result_lists, rrf_k=settings.rrf_k)
+
     if candidates:
-        candidates = rerank(original_query, candidates, top_k=RERANK_TOP_K)
+        candidates = rerank(original_query, candidates, top_k=settings.rerank_top_k)
 
-    return {"retrieved_chunks": candidates, "retry_count": retry_count}
+    return {"retrieved_chunks": candidates}
 
 
 def should_retry(state: AgentState) -> str:
-    if state["relevance_score"] < RELEVANCE_THRESHOLD and state["retry_count"] < MAX_RETRY_COUNT:
-        return "search_docs_node"
+    """Decide whether to re-search or proceed to answer generation.
+
+    retry_count counts completed search->grade cycles, so cycles beyond the
+    first are retries: with MAX_RETRY_COUNT=2 the agent searches at most
+    3 times (1 initial + 2 retries).
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Next node name: "search_docs" or "generate_answer".
+    """
+    settings = get_settings()
+    retries_used = state["retry_count"] - 1
+    if state["relevance_score"] < settings.relevance_threshold and retries_used < settings.max_retry_count:
+        logger.info(f"Relevance {state['relevance_score']:.3f} below threshold; retry {retries_used + 1}")
+        return "search_docs"
     return "generate_answer"
 
 
 def format_citations_node(state: AgentState) -> dict:
-    """Build the citation list from [N] markers Claude used, deduping by URL.
+    """Format inline [N] markers into a deduplicated citation list.
 
-    Rewrites the answer so visible markers map 1:1 to the citation list. If two chunks
-    share a source URL, both [3] and [5] (say) collapse to the same citation number.
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Partial update with citations and final_response.
     """
-    answer = state.get("answer", "")
-    chunks = state.get("retrieved_chunks", [])
-
-    used_indexes = sorted({int(n) for n in re.findall(r"\[(\d+)\]", answer)})
-
-    citations: list = []
-    url_to_seq: dict = {}
-    n_to_seq: dict = {}
-
-    for n in used_indexes:
-        if not (1 <= n <= len(chunks)):
-            continue
-        chunk = chunks[n - 1]
-        url = chunk.get("source_url", "")
-        if url in url_to_seq:
-            n_to_seq[n] = url_to_seq[url]
-            continue
-        seq = len(citations) + 1
-        url_to_seq[url] = seq
-        n_to_seq[n] = seq
-        snippet = chunk.get("content", "")[:120].strip() + "..."
-        citations.append({
-            "title": chunk.get("page_title", "Untitled"),
-            "url": url,
-            "snippet": snippet,
-        })
-
-    def _remap(match: "re.Match") -> str:
-        original = int(match.group(1))
-        if original in n_to_seq:
-            return f"[{n_to_seq[original]}]"
-        return ""  # drop invalid markers Claude may have hallucinated
-
-    final_answer = re.sub(r"\[(\d+)\]", _remap, answer)
-
-    # Fallback: if Claude didn't use any markers but we have chunks, surface top sources
-    if not citations and chunks:
-        for chunk in chunks[:3]:
-            url = chunk.get("source_url", "")
-            if url in url_to_seq:
-                continue
-            url_to_seq[url] = len(citations) + 1
-            snippet = chunk.get("content", "")[:120].strip() + "..."
-            citations.append({
-                "title": chunk.get("page_title", "Untitled"),
-                "url": url,
-                "snippet": snippet,
-            })
-
-    return {"citations": citations, "final_response": final_answer}
+    result = build_citations(state.get("answer", ""), state.get("retrieved_chunks", []))
+    return {"citations": result["citations"], "final_response": result["final_response"]}
 
 
 def build_graph():
+    """Assemble and compile the agent StateGraph.
+
+    Returns:
+        The compiled LangGraph runnable.
+    """
     graph = StateGraph(AgentState)
 
+    graph.add_node("load_memory", load_memory)
     graph.add_node("rewrite_query", rewrite_query)
-    graph.add_node("search_docs_node", search_docs_node)
+    graph.add_node("search_docs", search_docs_node)
     graph.add_node("grade_relevance", grade_relevance)
     graph.add_node("generate_answer", generate_answer)
-    graph.add_node("format_citations_node", format_citations_node)
+    graph.add_node("format_citations", format_citations_node)
+    graph.add_node("save_memory", save_memory)
 
-    graph.set_entry_point("rewrite_query")
-    graph.add_edge("rewrite_query", "search_docs_node")
-    graph.add_edge("search_docs_node", "grade_relevance")
+    graph.set_entry_point("load_memory")
+    graph.add_edge("load_memory", "rewrite_query")
+    graph.add_edge("rewrite_query", "search_docs")
+    graph.add_edge("search_docs", "grade_relevance")
     graph.add_conditional_edges("grade_relevance", should_retry)
-    graph.add_edge("generate_answer", "format_citations_node")
-    graph.add_edge("format_citations_node", END)
+    graph.add_edge("generate_answer", "format_citations")
+    graph.add_edge("format_citations", "save_memory")
+    graph.add_edge("save_memory", END)
 
     return graph.compile()
 

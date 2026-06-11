@@ -1,14 +1,19 @@
+"""CLI entry point for the one-time ingestion pipeline.
+
+Usage: uv run python scripts/ingest.py [--force-crawl]
+"""
+
 import argparse
-import logging
 import sys
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+from core.logging import setup_logging
 from ingestion.pipeline import run_ingestion
 
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
+setup_logging()
 
 parser = argparse.ArgumentParser(description="Run the ingestion pipeline.")
 parser.add_argument(
@@ -20,7 +25,7 @@ args = parser.parse_args()
 
 try:
     result = run_ingestion(force_crawl=args.force_crawl)
-    print(f"✅ Ingestion complete: {result}")
+    print(f"Ingestion complete: {result}")
 except Exception as e:
-    print(f"❌ Ingestion failed: {e}")
+    print(f"Ingestion failed: {e}")
     sys.exit(1)

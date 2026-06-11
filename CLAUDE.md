@@ -7,42 +7,35 @@
 
 ## 1. What This Project Does
 
-An **Agentic RAG system** that answers questions over Anthropic's Prompt Engineering documentation
-(`docs.anthropic.com/en/docs/build-with-claude/prompt-engineering`).
+An **Agentic RAG system** that answers questions over Anthropic's Prompt Engineering documentation.
 
-A LangGraph agent receives a user question, rewrites it into multiple query variants,
-searches a Supabase+PGVector vector store, grades the retrieved chunks for relevance,
-generates an answer using Claude, formats citations, and returns a structured JSON response.
-The whole thing is exposed via a FastAPI endpoint and evaluated with LangSmith.
+A LangGraph agent loads conversation memory, rewrites the user question into HyDE + keyword
+variants, runs hybrid (vector + full-text) search on Supabase+PGVector fused with RRF,
+reranks with Voyage, grades relevance (with retries), generates a cited answer with Claude,
+formats citations, and persists memory (with rolling summarization). Exposed via FastAPI
+with a static chat UI, API-key auth, and rate limiting. Evaluated with LangSmith.
 
 ---
 
 ## 2. Architecture
 
 ```
-User Question
-     │
-     ▼
-FastAPI  POST /ask
-     │
-     ▼
+User Question (UI or POST /ask)
+ │
+ ▼
 LangGraph Agent
-     │
-     ├─► Node: rewrite_query     → generates 2-3 query variants via Claude
-     │
-     ├─► Tool: search_docs       → embeds query with Voyage AI, queries PGVector
-     │
-     ├─► Node: grade_relevance   → checks avg similarity score
-     │         │
-     │         ├─ score < 0.70 AND retry < 2 → back to search_docs
-     │         └─ score >= 0.70              → generate_answer
-     │
-     ├─► Node: generate_answer   → Claude answers using retrieved chunks
-     │
-     └─► Tool: format_citations  → builds [{title, url, snippet}] list
-          │
-          ▼
-     Final JSON Response
+ ├─► load_memory       → history + rolling summary from session store
+ ├─► rewrite_query     → 2 HyDE paragraphs + 1 keyword query (JSON prefill)
+ ├─► search_docs       → hybrid_match_docs RPC per variant → RRF fusion → Voyage rerank
+ ├─► grade_relevance   → mean rerank score; retry_count counts search→grade cycles
+ │     ├─ score < RELEVANCE_THRESHOLD AND retries_used < MAX_RETRY_COUNT → search_docs
+ │     └─ otherwise → generate_answer
+ ├─► generate_answer   → Claude, XML-tagged documents, inline [N] markers
+ ├─► format_citations  → dedup by URL, renumber markers
+ └─► save_memory       → persist turn to Supabase + summarize long histories
+ │
+ ▼
+JSON Response (answer, citations, session_id, rewritten_queries, trace_id)
 ```
 
 ---
@@ -51,95 +44,98 @@ LangGraph Agent
 
 | Layer | Technology | Notes |
 |---|---|---|
-| LLM | `claude-sonnet-4-6` via `anthropic` SDK | Use for all generation |
+| LLM | `claude-sonnet-4-6` via `anthropic` SDK | All generation; judge is `claude-opus-4-7` |
 | Embeddings | `voyage-4` via `voyageai` | 1024 dims, `input_type` param required |
-| Vector Store | Supabase + PGVector | Use `supabase-py` client |
+| Reranker | Voyage `rerank-2` | Precision stage after hybrid retrieval |
+| Vector Store | Supabase + PGVector + tsvector | Raw SQL RPCs: `match_docs`, `hybrid_match_docs` |
 | Agent | LangGraph `StateGraph` | See `agent/graph.py` |
-| Retriever | LangChain | `SupabaseVectorStore` or raw SQL via RPC |
-| API | FastAPI | Async, Pydantic v2 schemas |
-| Tracing | LangSmith | Enabled via env vars, zero extra code |
-| Evaluation | LangSmith SDK | `langsmith.evaluation` module |
-| Crawler | Firecrawl Python SDK | One-time ingestion script |
+| API | FastAPI + slowapi | Async, Pydantic v2 schemas, API-key auth, CORS |
+| Config | pydantic-settings | `core/config.py` — never read env vars directly |
+| Tracing | LangSmith | Enabled via env vars; run metadata/tags on /ask |
+| Evaluation | LangSmith SDK | 5 metrics incl. deterministic retrieval_hit_rate |
+| Crawler | Firecrawl Python SDK | One-time ingestion with seed URLs + content hashing |
+| UI | Static HTML/JS | `static/index.html`, no build step |
 
 ---
 
 ## 4. Environment Variables
 
-All secrets live in `.env`. Never hardcode them. Load with `python-dotenv`.
+All secrets live in `.env` (see `.env.example` for the full annotated list).
+Never hardcode them. All configuration is read through `core.config.get_settings()`.
 
-```
-# Anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Voyage AI (MongoDB-managed key)
-VOYAGE_API_KEY=pa-...
-
-# Supabase
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_SERVICE_KEY=eyJ...       # Use service key (not anon) for server-side writes
-
-# Firecrawl
-FIRECRAWL_API_KEY=fc-...
-
-# LangSmith
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=ls__...
-LANGCHAIN_PROJECT=anthropic-rag-agent
-
-# App settings
-RETRIEVAL_TOP_K=5
-RELEVANCE_THRESHOLD=0.70
-MAX_RETRY_COUNT=2
-CHUNK_SIZE=800
-CHUNK_OVERLAP=100
-```
+Key tunables and their defaults: `CHUNK_SIZE=1200`, `CHUNK_OVERLAP=200`,
+`RETRIEVAL_TOP_K=6`, `RERANK_TOP_K=6`, `RECALL_THRESHOLD=0.30`,
+`RELEVANCE_THRESHOLD=0.45`, `MAX_RETRY_COUNT=2`, `USE_HYBRID_SEARCH=true`,
+`RRF_K=60`, `SESSION_TTL_SECONDS=3600`, `MAX_HISTORY_MESSAGES=12`,
+`API_KEYS=` (empty = auth disabled), `RATE_LIMIT_ASK=20/minute`.
 
 ---
 
 ## 5. File Responsibilities
 
+### `core/`
+| File | Responsibility |
+|---|---|
+| `config.py` | pydantic-settings `Settings` + cached `get_settings()`. Single source for all env vars |
+| `logging.py` | `setup_logging()` used by all entry points |
+
 ### `ingestion/`
 | File | Responsibility |
 |---|---|
-| `crawler.py` | Firecrawl SDK wrapper. Crawls docs URL, returns list of `{url, markdown, title}` dicts |
-| `chunker.py` | RecursiveCharacterTextSplitter. Input: raw page. Output: list of chunk dicts with metadata preserved |
-| `embedder.py` | Voyage AI client wrapper. `embed_documents(texts)` and `embed_query(text)` with correct `input_type` |
-| `pipeline.py` | Orchestrates: crawl → chunk → embed → upsert to Supabase. The main ingestion entry point |
+| `crawler.py` | Firecrawl wrapper. Seed URL list + map discovery, include/exclude patterns, per-page retry/backoff, JSON cache with content hashes |
+| `chunker.py` | RecursiveCharacterTextSplitter + markdown cleaning + contextual headers (page title + section) + `content_hash()` |
+| `embedder.py` | Lazy Voyage client. `embed_documents(texts)` / `embed_query(text)` with correct `input_type` |
+| `pipeline.py` | crawl → chunk → hash-diff → embed only changed → upsert → prune stale chunks |
 
 ### `retrieval/`
 | File | Responsibility |
 |---|---|
-| `vector_store.py` | Supabase client setup. `upsert_chunks(chunks)` and `similarity_search(embedding, k, threshold)` via RPC |
-| `retriever.py` | High-level retriever used by the agent tool. Takes a query string, returns ranked chunk dicts |
+| `vector_store.py` | Lazy Supabase client. `upsert_chunks`, `similarity_search`, `hybrid_search` (falls back to vector-only pre-migration), `fetch_existing_hashes`, `delete_stale_chunks`, `health_check` |
+| `fusion.py` | `reciprocal_rank_fusion()` — merges ranked lists across query variants |
+| `reranker.py` | Voyage rerank wrapper with graceful fallback |
+| `retriever.py` | High-level `retrieve(query, k, threshold)` used by agent + tool |
 
 ### `agent/`
 | File | Responsibility |
 |---|---|
-| `state.py` | `AgentState` TypedDict. All fields the graph reads/writes |
-| `tools.py` | Two LangChain tools: `search_docs` and `format_citations` |
-| `nodes.py` | Three node functions: `rewrite_query`, `grade_relevance`, `generate_answer` |
-| `graph.py` | Assembles the `StateGraph`, adds nodes, edges, conditional edges, compiles it |
-| `session.py` | In-memory dict `{session_id: List[messages]}`. `get_history`, `save_history`, `clear_history` |
+| `state.py` | `AgentState` TypedDict (includes `summary`, `error`) |
+| `prompts.py` | ALL runtime prompts: XML-tagged, few-shot, prefill constants |
+| `nodes.py` | `load_memory`, `rewrite_query`, `grade_relevance`, `generate_answer`, `save_memory`; lazy Anthropic client; per-call latency/token logging |
+| `citations.py` | `build_citations()` shared by graph node and tool |
+| `tools.py` | Thin LangChain tool wrappers over retriever + citations |
+| `graph.py` | `search_docs_node`, `should_retry`, `format_citations_node`, `build_graph()` |
+| `session.py` | Two-tier memory: TTL in-memory cache + Supabase `chat_messages`/`chat_sessions`. `get_history`, `get_summary`, `append_messages`, `save_summary`, `trim_history`, `clear_history` |
 
 ### `api/`
 | File | Responsibility |
 |---|---|
-| `schemas.py` | Pydantic v2 models: `AskRequest`, `AskResponse`, `Citation`, `HealthResponse` |
-| `routes.py` | Route handlers: `POST /ask`, `GET /health`, `GET /history/{session_id}` |
-| `main.py` | FastAPI app, lifespan context manager (compiles graph on startup), mounts router |
+| `schemas.py` | Pydantic v2 models incl. `FeedbackRequest`, `DeleteHistoryResponse`; `trace_id` on `AskResponse` |
+| `security.py` | `require_api_key` dependency (constant-time compare) + slowapi `limiter` |
+| `routes.py` | `POST /ask`, `GET /health` (public), `GET/DELETE /history/{id}`, `POST /feedback`. Sanitized 500s, graph run in threadpool, LangSmith run_id/tags/metadata |
+| `main.py` | FastAPI app: CORS, rate-limit handler, static mount, `/` serves the chat UI |
+
+### `static/`
+| File | Responsibility |
+|---|---|
+| `index.html` | Zero-build chat UI: markdown rendering, citation chips, feedback buttons, localStorage session, dark theme |
 
 ### `evaluation/`
 | File | Responsibility |
 |---|---|
 | `dataset.json` | 15 Q&A pairs over the prompt engineering docs |
-| `evaluators.py` | LangSmith LLM-as-judge evaluators: `relevance`, `faithfulness`, `citation_quality` |
-| `run_eval.py` | Loads dataset → runs agent on each → scores → prints summary table |
+| `evaluators.py` | Judges: `relevance`, `faithfulness`, `citation_quality`, `answer_relevance`; deterministic `retrieval_hit_rate` |
+| `run_eval.py` | LangSmith experiment (or local loop) + summary table with latency p50/p95 |
 
 ### `scripts/`
 | File | Responsibility |
 |---|---|
-| `setup_supabase.sql` | Creates `docs_chunks` table, enables pgvector, creates HNSW index, creates RPC function |
-| `ingest.py` | CLI entry: `python scripts/ingest.py`. Calls `ingestion/pipeline.py` |
+| `setup_supabase.sql` | Base table, HNSW index, `match_docs` RPC |
+| `migrate_hybrid_search.sql` | tsvector + GIN, `hybrid_match_docs` RRF RPC, `chunk_index` fix, chat tables, `content_hash` |
+| `ingest.py` | CLI: `uv run python scripts/ingest.py [--force-crawl]` |
+
+### `tests/`
+Unit tests, fully mocked, no API keys required. Run with `uv run pytest`.
+Live tests must be marked `@pytest.mark.integration` (deselected by default).
 
 ---
 
@@ -149,14 +145,16 @@ CHUNK_OVERLAP=100
 class AgentState(TypedDict):
     session_id: str
     messages: Annotated[List[BaseMessage], operator.add]  # reducer: append
-    query: str                        # current user question
-    rewritten_queries: List[str]      # Claude-generated query variants
-    retrieved_chunks: List[dict]      # [{content, source_url, page_title, similarity}]
-    relevance_score: float            # mean similarity of top-k chunks
-    answer: str                       # raw generated answer
-    citations: List[dict]             # [{title, url, snippet}]
-    final_response: str               # answer + formatted citations
-    retry_count: int                  # retrieval retry counter
+    query: str
+    summary: str               # rolling summary of older turns
+    rewritten_queries: List[str]
+    retrieved_chunks: List[dict]
+    relevance_score: float     # mean rerank/cosine score of candidates
+    answer: str
+    citations: List[dict]
+    final_response: str
+    retry_count: int           # completed search→grade cycles (1 = initial search)
+    error: str                 # non-empty when a node degraded gracefully
 ```
 
 ---
@@ -164,129 +162,104 @@ class AgentState(TypedDict):
 ## 7. Graph Flow — Conditional Logic
 
 ```python
-# In graph.py:
-graph.add_conditional_edges(
-    "grade_relevance",
-    should_retry,  # returns "search_docs" or "generate_answer"
-)
-
+# retry_count counts search→grade cycles; retries_used = retry_count - 1.
 def should_retry(state: AgentState) -> str:
-    if state["relevance_score"] < RELEVANCE_THRESHOLD and state["retry_count"] < MAX_RETRY_COUNT:
+    settings = get_settings()
+    retries_used = state["retry_count"] - 1
+    if state["relevance_score"] < settings.relevance_threshold and retries_used < settings.max_retry_count:
         return "search_docs"
     return "generate_answer"
 ```
 
+With `MAX_RETRY_COUNT=2`: at most 3 searches (1 initial + 2 retries).
+
 ---
 
-## 8. The Two Custom Tools
+## 8. Retrieval Pipeline
 
-### Tool 1: `search_docs`
-```
-Input:  query (str), k (int, default=5)
-Action: embed query with Voyage AI input_type="query"
-        call Supabase RPC match_docs(embedding, k, threshold)
-Output: List[dict] with keys: content, source_url, page_title, similarity
-```
-
-### Tool 2: `format_citations`
-```
-Input:  answer (str), chunks (List[dict])
-Action: deduplicate chunks by source_url
-        extract a short snippet (first 120 chars) per unique source
-        number them [1], [2], etc.
-Output: {"formatted": "answer text [1][2]", "citations": [{title, url, snippet}]}
-```
+1. Each query variant → `hybrid_match_docs` RPC (vector + full-text, RRF in SQL).
+2. Variant result lists fused in Python via `reciprocal_rank_fusion()`.
+3. Voyage `rerank-2` reranks fused candidates against the ORIGINAL question.
+4. On retry: recall floor drops 0.05/attempt, per-variant k doubles.
 
 ---
 
 ## 9. FastAPI Endpoints
 
-### `POST /ask`
-```json
-// Request
-{
-  "question": "What are XML tags used for in prompts?",
-  "session_id": "optional-uuid-for-multi-turn"
-}
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | `/` | no | Chat UI |
+| POST | `/ask` | X-API-Key* | Rate limited; returns `trace_id` |
+| GET | `/health` | no | Public for healthchecks |
+| GET | `/history/{session_id}` | X-API-Key* | 404 when empty |
+| DELETE | `/history/{session_id}` | X-API-Key* | Clears cache + DB |
+| POST | `/feedback` | X-API-Key* | Records user rating on the LangSmith trace |
 
-// Response
-{
-  "answer": "XML tags help Claude...",
-  "citations": [
-    {"title": "Use XML tags", "url": "https://docs.anthropic.com/...", "snippet": "XML tags..."}
-  ],
-  "session_id": "uuid",
-  "query_rewritten": ["What is the role of XML tags...", "XML tags Claude prompts..."]
-}
-```
-
-### `GET /health`
-```json
-{"status": "ok", "vector_store": "connected", "model": "claude-sonnet-4-5"}
-```
-
-### `GET /history/{session_id}`
-```json
-{"session_id": "uuid", "messages": [...]}
-```
+*Only when `API_KEYS` is set; disabled by default for local dev.
 
 ---
 
 ## 10. Evaluation Approach
 
-LangSmith LLM-as-judge with three criteria, each scored 1-5:
+Five metrics, judges scored 1-5, hit rate 0/1:
 
 | Evaluator | Question it answers |
 |---|---|
 | `relevance` | Are the retrieved chunks relevant to the question? |
 | `faithfulness` | Does the answer only use facts from the retrieved chunks? |
-| `citation_quality` | Are citations accurate and properly linked to the answer? |
+| `citation_quality` | Are citations accurate and properly linked? |
+| `answer_relevance` | Does the answer actually address the question? |
+| `retrieval_hit_rate` | Was the expected source page retrieved? (deterministic) |
 
-Run with: `python evaluation/run_eval.py`
-Results appear in LangSmith dashboard under project `anthropic-rag-agent`.
+Run with: `uv run python evaluation/run_eval.py`
 
 ---
 
 ## 11. Coding Conventions
 
-- Python 3.11+, type hints everywhere
-- Async FastAPI route handlers (`async def`)
-- All LangGraph nodes are pure functions: `(state: AgentState) -> dict`
-  - Return only the keys you're updating, not the full state
-- All Anthropic API calls use `claude-sonnet-4-5`
+- Python 3.12, type hints everywhere
+- Async FastAPI route handlers; blocking work via `run_in_threadpool`
+- All LangGraph nodes are pure functions: `(state: AgentState) -> dict` returning only changed keys
+- All configuration via `core.config.get_settings()` — never `os.getenv()` in business logic
+- All external clients (Anthropic, Voyage, Supabase) are LAZY — modules must import without env vars
 - All logging via `logging` stdlib, not `print()`
-- Pydantic v2 syntax (`model_config`, not `class Config`)
-- No global mutable state outside of `session.py`
+- Pydantic v2 syntax
+- All prompts live in `agent/prompts.py`
+- No emojis in code
 
 ---
 
 ## 12. What NOT to Do
 
-- ❌ Do not use `langchain_community.vectorstores.SupabaseVectorStore` directly — use raw SQL RPC for more control
-- ❌ Do not store API keys in code — always `os.getenv()`
+- ❌ Do not use `langchain_community.vectorstores.SupabaseVectorStore` — raw SQL RPC only
+- ❌ Do not store API keys in code — settings only
 - ❌ Do not use `gpt-*` models — this is an Anthropic project
-- ❌ Do not make the ingestion pipeline re-run on API startup — it's a one-time script
-- ❌ Do not skip `input_type` in Voyage AI calls — it meaningfully affects retrieval quality
-- ❌ Do not return the full state from LangGraph nodes — return only changed keys
+- ❌ Do not make the ingestion pipeline re-run on API startup
+- ❌ Do not skip `input_type` in Voyage AI calls
+- ❌ Do not return the full state from LangGraph nodes — only changed keys
+- ❌ Do not create module-level API clients — keep them lazy
+- ❌ Do not leak exception details in HTTP responses
 
 ---
 
 ## 13. How to Run (Full Setup)
 
 ```bash
-# 1. Install uv (if not installed)
-# https://docs.astral.sh/uv/getting-started/installation/
-
-# 2. Install dependencies
+# 1. Install dependencies
 uv sync
+
+# 2. Supabase: run scripts/setup_supabase.sql, then scripts/migrate_hybrid_search.sql
 
 # 3. Run ingestion
 uv run python scripts/ingest.py
 
-# 4. Start API
+# 4. Start API + UI
 uv run uvicorn api.main:app --reload --port 8000
 
-# 5. Run evaluation
+# 5. Run tests
+uv run pytest
+
+# 6. Run evaluation
 uv run python evaluation/run_eval.py
 ```
 

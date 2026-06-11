@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Anthropic Docs RAG</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-2: #1f2330;
+    --border: #2a2f3f;
+    --text: #e8eaf0;
+    --text-dim: #9aa0b0;
+    --accent: #d97b4f;
+    --accent-soft: rgba(217, 123, 79, 0.14);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  header .title { display: flex; align-items: center; gap: 10px; }
+  header .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 15px;
+  }
+  header h1 { font-size: 15px; font-weight: 600; }
+  header p { font-size: 12px; color: var(--text-dim); }
+  #clear-btn {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 14px; font-size: 12.5px; cursor: pointer;
+    transition: all .15s;
+  }
+  #clear-btn:hover { color: var(--text); border-color: var(--text-dim); }
+
+  #chat {
+    flex: 1; overflow-y: auto;
+    padding: 26px 0 12px;
+  }
+  .inner { max-width: 780px; margin: 0 auto; padding: 0 20px; }
+
+  .welcome { text-align: center; padding: 46px 20px; }
+  .welcome h2 { font-size: 21px; font-weight: 600; margin-bottom: 8px; }
+  .welcome p { color: var(--text-dim); font-size: 14px; margin-bottom: 22px; }
+  .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .suggestion {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 15px; font-size: 13px;
+    color: var(--text-dim); cursor: pointer; transition: all .15s;
+  }
+  .suggestion:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+  .msg { display: flex; margin-bottom: 18px; }
+  .msg.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 86%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 14.5px;
+    line-height: 1.6;
+    word-wrap: break-word;
+  }
+  .msg.user .bubble {
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot .bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .bubble p { margin-bottom: 10px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul, .bubble ol { margin: 6px 0 10px 22px; }
+  .bubble li { margin-bottom: 4px; }
+  .bubble code {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 5px; padding: 1px 6px; font-size: 13px;
+    font-family: Consolas, "Courier New", monospace;
+  }
+  .bubble pre {
+    background: #0c0e14; border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; overflow-x: auto;
+    margin: 8px 0 12px;
+  }
+  .bubble pre code { background: none; border: none; padding: 0; }
+  .bubble a { color: var(--accent); }
+  .cite-marker {
+    display: inline-block; background: var(--accent-soft); color: var(--accent);
+    border-radius: 5px; padding: 0 5px; font-size: 12px; font-weight: 600;
+    text-decoration: none; margin: 0 1px;
+  }
+
+  .citations { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .citations-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim); margin-bottom: 8px; }
+  .citation-chip {
+    display: flex; gap: 8px; align-items: baseline;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 8px 11px; margin-bottom: 6px;
+    text-decoration: none; transition: border-color .15s;
+  }
+  .citation-chip:hover { border-color: var(--accent); }
+  .citation-chip .num { color: var(--accent); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .citation-chip .meta { min-width: 0; }
+  .citation-chip .ctitle { color: var(--text); font-size: 13px; font-weight: 600; display: block; }
+  .citation-chip .snippet {
+    color: var(--text-dim); font-size: 12px;
+    display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .feedback { margin-top: 10px; display: flex; gap: 6px; align-items: center; }
+  .fb-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 7px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+  }
+  .fb-btn:hover { color: var(--text); }
+  .fb-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+  .typing { display: inline-flex; gap: 5px; padding: 6px 2px; }
+  .typing span {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim);
+    animation: blink 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+
+  footer { padding: 12px 0 20px; background: linear-gradient(transparent, var(--bg) 35%); }
+  .input-row {
+    display: flex; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 8px 8px 16px;
+  }
+  .input-row:focus-within { border-color: var(--accent); }
+  #question {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 14.5px; resize: none;
+    font-family: inherit; line-height: 1.5; max-height: 130px; padding: 8px 0;
+  }
+  #send-btn {
+    background: var(--accent); border: none; border-radius: 10px;
+    color: #fff; font-size: 14px; font-weight: 600;
+    padding: 0 18px; cursor: pointer; transition: opacity .15s;
+  }
+  #send-btn:disabled { opacity: .45; cursor: default; }
+  .hint { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 9px; }
+
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #3a1f24; color: #ff9c9c; border: 1px solid #6e3a42;
+    border-radius: 10px; padding: 11px 20px; font-size: 13.5px;
+    opacity: 0; transition: all .3s; pointer-events: none; z-index: 10;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <div class="logo">A</div>
+      <div>
+        <h1>Anthropic Docs RAG</h1>
+        <p>Prompt engineering documentation assistant</p>
+      </div>
+    </div>
+    <button id="clear-btn" title="Clear conversation">New conversation</button>
+  </header>
+
+  <div id="chat">
+    <div class="inner" id="messages">
+      <div class="welcome" id="welcome">
+        <h2>Ask about prompt engineering</h2>
+        <p>Answers are grounded in Anthropic's official documentation, with citations.</p>
+        <div class="suggestions">
+          <div class="suggestion">What are XML tags used for in prompts?</div>
+          <div class="suggestion">How does chain-of-thought prompting work?</div>
+          <div class="suggestion">When should I use a system prompt?</div>
+          <div class="suggestion">How do I prefill Claude's response?</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="inner">
+      <div class="input-row">
+        <textarea id="question" rows="1" placeholder="Ask a question about prompt engineering..."></textarea>
+        <button id="send-btn">Send</button>
+      </div>
+      <div class="hint">Enter to send, Shift+Enter for a new line</div>
+    </div>
+  </footer>
+
+  <div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var messagesEl = document.getElementById("messages");
+  var chatEl = document.getElementById("chat");
+  var inputEl = document.getElementById("question");
+  var sendBtn = document.getElementById("send-btn");
+  var clearBtn = document.getElementById("clear-btn");
+  var welcomeEl = document.getElementById("welcome");
+  var toastEl = document.getElementById("toast");
+
+  var sessionId = localStorage.getItem("rag_session_id") || null;
+  var isBusy = false;
+
+  function showToast(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add("show");
+    setTimeout(function () { toastEl.classList.remove("show"); }, 4000);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // Minimal markdown renderer (code blocks, inline code, bold, links, lists).
+  function renderMarkdown(text) {
+    var codeBlocks = [];
+    text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, function (_, lang, code) {
+      codeBlocks.push(code);
+      return "\u0000CODE" + (codeBlocks.length - 1) + "\u0000";
+    });
+
+    text = escapeHtml(text);
+    text = text.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+    text = text.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+    text = text.replace(/\[(\d+)\]/g, '<span class="cite-marker">$1</span>');
+    text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    var lines = text.split("\n");
+    var html = "", inList = false, para = [];
+    function flushPara() {
+      if (para.length) { html += "<p>" + para.join("<br>") + "</p>"; para = []; }
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var m = line.match(/^\s*[-*]\s+(.*)/);
+      var h = line.match(/^#{1,4}\s+(.*)/);
+      if (m) {
+        flushPara();
+        if (!inList) { html += "<ul>"; inList = true; }
+        html += "<li>" + m[1] + "</li>";
+      } else {
+        if (inList) { html += "</ul>"; inList = false; }
+        if (h) { flushPara(); html += "<p><strong>" + h[1] + "</strong></p>"; }
+        else if (line.trim() === "") { flushPara(); }
+        else { para.push(line); }
+      }
+    }
+    if (inList) html += "</ul>";
+    flushPara();
+
+    html = html.replace(/\u0000CODE(\d+)\u0000/g, function (_, idx) {
+      return "<pre><code>" + escapeHtml(codeBlocks[parseInt(idx, 10)]) + "</code></pre>";
+    });
+    return html;
+  }
+
+  function scrollDown() { chatEl.scrollTop = chatEl.scrollHeight; }
+
+  function addUserMessage(text) {
+    if (welcomeEl) { welcomeEl.remove(); welcomeEl = null; }
+    var div = document.createElement("div");
+    div.className = "msg user";
+    div.innerHTML = '<div class="bubble"></div>';
+    div.querySelector(".bubble").textContent = text;
+    messagesEl.appendChild(div);
+    scrollDown();
+  }
+
+  function addTyping() {
+    var div = document.createElement("div");
+    div.className = "msg bot";
+    div.id = "typing-msg";
+    div.innerHTML = '<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+    messagesEl.appendChild(div);
+    scrollDown();
+  }
+
+  function removeTyping() {
+    var t = document.getElementById("typing-msg");
+    if (t) t.remove();
+  }
+
+  function addBotMessage(data) {
+    var div = document.createElement("div");
+    div.className = "msg bot";
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = renderMarkdown(data.answer || "");
+
+    if (data.citations && data.citations.length) {
+      var cits = document.createElement("div");
+      cits.className = "citations";
+      cits.innerHTML = '<div class="citations-label">Sources</div>';
+      data.citations.forEach(function (c, i) {
+        var a = document.createElement("a");
+        a.className = "citation-chip";
+        a.href = c.url; a.target = "_blank"; a.rel = "noopener";
+        a.innerHTML = '<span class="num">[' + (i + 1) + ']</span>' +
+          '<span class="meta"><span class="ctitle"></span><span class="snippet"></span></span>';
+        a.querySelector(".ctitle").textContent = c.title;
+        a.querySelector(".snippet").textContent = c.snippet;
+        cits.appendChild(a);
+      });
+      bubble.appendChild(cits);
+    }
+
+    if (data.trace_id) {
+      var fb = document.createElement("div");
+      fb.className = "feedback";
+      var up = document.createElement("button");
+      up.className = "fb-btn"; up.textContent = "Helpful";
+      var down = document.createElement("button");
+      down.className = "fb-btn"; down.textContent = "Not helpful";
+      function send(score, btn, other) {
+        fetch("/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trace_id: data.trace_id, score: score })
+        }).catch(function () {});
+        btn.classList.add("active");
+        other.classList.remove("active");
+      }
+      up.onclick = function () { send(1.0, up, down); };
+      down.onclick = function () { send(0.0, down, up); };
+      fb.appendChild(up); fb.appendChild(down);
+      bubble.appendChild(fb);
+    }
+
+    div.appendChild(bubble);
+    messagesEl.appendChild(div);
+    scrollDown();
+  }
+
+  function setBusy(busy) {
+    isBusy = busy;
+    sendBtn.disabled = busy;
+    inputEl.disabled = busy;
+  }
+
+  function sendQuestion(text) {
+    if (!text.trim() || isBusy) return;
+    addUserMessage(text.trim());
+    inputEl.value = "";
+    autoResize();
+    setBusy(true);
+    addTyping();
+
+    fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: text.trim(), session_id: sessionId })
+    })
+      .then(function (res) {
+        if (res.status === 401) throw new Error("Unauthorized: this server requires an API key.");
+        if (res.status === 429) throw new Error("Rate limit reached. Please wait a moment.");
+        if (!res.ok) throw new Error("Request failed (" + res.status + "). Please try again.");
+        return res.json();
+      })
+      .then(function (data) {
+        sessionId = data.session_id;
+        localStorage.setItem("rag_session_id", sessionId);
+        removeTyping();
+        addBotMessage(data);
+      })
+      .catch(function (err) {
+        removeTyping();
+        showToast(err.message || "Something went wrong.");
+      })
+      .finally(function () {
+        setBusy(false);
+        inputEl.focus();
+      });
+  }
+
+  function autoResize() {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 130) + "px";
+  }
+
+  inputEl.addEventListener("input", autoResize);
+  inputEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendQuestion(inputEl.value);
+    }
+  });
+  sendBtn.addEventListener("click", function () { sendQuestion(inputEl.value); });
+
+  document.querySelectorAll(".suggestion").forEach(function (el) {
+    el.addEventListener("click", function () { sendQuestion(el.textContent); });
+  });
+
+  clearBtn.addEventListener("click", function () {
+    var old = sessionId;
+    sessionId = null;
+    localStorage.removeItem("rag_session_id");
+    messagesEl.innerHTML =
+      '<div class="welcome"><h2>Ask about prompt engineering</h2>' +
+      "<p>Answers are grounded in Anthropic's official documentation, with citations.</p></div>";
+    welcomeEl = messagesEl.querySelector(".welcome");
+    if (old) {
+      fetch("/history/" + encodeURIComponent(old), { method: "DELETE" }).catch(function () {});
+    }
+  });
+
+  inputEl.focus();
+})();
+</script>
+</body>
+</html>

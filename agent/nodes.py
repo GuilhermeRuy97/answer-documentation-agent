@@ -1,122 +1,280 @@
+"""LangGraph node functions.
+
+All nodes are pure functions (state -> partial state update) with node-level
+error handling: a failed Claude call degrades gracefully instead of crashing
+the request. The Anthropic client is lazy so the module imports without keys.
+"""
+
 import json
 import logging
-import os
+import time
+from typing import List, Optional
 
 import anthropic
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
+from agent import session as session_store
+from agent.prompts import (
+    ANSWER_SYSTEM,
+    REWRITE_PREFILL,
+    REWRITE_SYSTEM,
+    SUMMARY_SYSTEM,
+    build_answer_prompt,
+    build_rewrite_prompt,
+    build_summary_prompt,
+)
 from agent.state import AgentState
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", "2"))
-
-client = anthropic.Anthropic()
+_client: Optional[anthropic.Anthropic] = None
 
 
-def _strip_json_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return text
+def get_anthropic_client() -> anthropic.Anthropic:
+    """Return the lazily-initialized Anthropic client.
+
+    Returns:
+        The shared Anthropic client.
+
+    Raises:
+        RuntimeError: If ANTHROPIC_API_KEY is not configured.
+    """
+    global _client
+    if _client is not None:
+        return _client
+
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY must be set to call Claude")
+
+    _client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return _client
+
+
+def _call_claude(
+    system: str,
+    user_prompt: str,
+    max_tokens: int,
+    temperature: float,
+    prefill: str | None = None,
+) -> str:
+    """Call Claude and return the (prefill-prepended) text, logging usage/latency.
+
+    Args:
+        system: System prompt.
+        user_prompt: User message content.
+        max_tokens: Generation cap.
+        temperature: Sampling temperature.
+        prefill: Optional assistant-turn prefill for structured output.
+
+    Returns:
+        Generated text, including the prefill prefix when provided.
+    """
+    settings = get_settings()
+    messages = [{"role": "user", "content": user_prompt}]
+    if prefill:
+        messages.append({"role": "assistant", "content": prefill})
+
+    started = time.perf_counter()
+    response = get_anthropic_client().messages.create(
+        model=settings.generation_model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        system=system,
+        messages=messages,
+    )
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    usage = response.usage
+    logger.info(
+        f"Claude call: {elapsed_ms:.0f}ms, in={usage.input_tokens} out={usage.output_tokens} tokens"
+    )
+    text = response.content[0].text
+    return (prefill or "") + text
+
+
+def _format_turns(messages: List[BaseMessage], limit: int, max_chars: int = 300) -> str:
+    """Format the last N conversation turns as plain text.
+
+    Args:
+        messages: Conversation messages.
+        limit: Max number of trailing messages to include.
+        max_chars: Per-message truncation.
+
+    Returns:
+        "User: ...\nAssistant: ..." formatted text.
+    """
+    lines = []
+    for msg in messages[-limit:]:
+        role = "User" if isinstance(msg, HumanMessage) else "Assistant"
+        lines.append(f"{role}: {str(msg.content)[:max_chars]}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Graph nodes
+# ---------------------------------------------------------------------------
+
+def load_memory(state: AgentState) -> dict:
+    """Load conversation history and rolling summary into the graph state.
+
+    Args:
+        state: Current agent state (needs session_id).
+
+    Returns:
+        Partial update with messages and summary.
+    """
+    session_id = state["session_id"]
+    history = session_store.get_history(session_id)
+    summary = session_store.get_summary(session_id)
+    logger.info(f"Loaded memory for session {session_id}: {len(history)} messages, summary={'yes' if summary else 'no'}")
+    return {"messages": history, "summary": summary}
 
 
 def rewrite_query(state: AgentState) -> dict:
-    """HyDE: generate hypothetical answer paragraphs to use as embedding queries.
+    """Generate retrieval query variants: HyDE paragraphs + a keyword query.
 
-    Hypothetical answers are more similar to real document chunks than questions are,
-    so they tend to retrieve better matches.
+    Hypothetical answers embed closer to real documentation chunks than raw
+    questions do; the keyword variant feeds the full-text leg of hybrid search.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Partial update with rewritten_queries (original question always first).
     """
     query = state["query"]
+    history_text = _format_turns(state.get("messages", []), limit=4)
+    summary = state.get("summary", "")
 
-    history = state.get("messages", [])
-    history_text = ""
-    if history:
-        lines = []
-        for msg in history[-4:]:
-            role = "User" if isinstance(msg, HumanMessage) else "Assistant"
-            lines.append(f"{role}: {msg.content[:300]}")
-        history_text = "\nConversation so far:\n" + "\n".join(lines) + "\n"
-
-    prompt = (
-        f"{history_text}"
-        f"User question: {query}\n\n"
-        "Write 2 short hypothetical paragraphs (3-5 sentences each) that would directly "
-        "answer this question, written in the style of Anthropic's prompt engineering "
-        "documentation. These paragraphs will be used to find similar real documentation, "
-        "so phrase them as concrete factual statements about prompt engineering. "
-        "If the question is a follow-up (e.g. 'give me an example'), use the conversation "
-        "context to make each paragraph self-contained.\n\n"
-        "Return ONLY a JSON array of 2 strings (each string a paragraph). No explanation."
-    )
+    prompt = build_rewrite_prompt(query, history_text, summary)
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
+        raw = _call_claude(
+            system=REWRITE_SYSTEM,
+            user_prompt=prompt,
             max_tokens=512,
             temperature=0.7,
-            messages=[{"role": "user", "content": prompt}],
+            prefill=REWRITE_PREFILL,
         )
-        variants = json.loads(_strip_json_fence(response.content[0].text))
-        logger.info(f"Generated {len(variants)} hypothetical answers (HyDE)")
-        # Keep original query first so reranker can also retrieve via the actual question
+        parsed = json.loads(raw)
+        hyde = [v for v in parsed.get("hyde", []) if isinstance(v, str) and v.strip()]
+        keywords = parsed.get("keywords", "")
+        variants = hyde + ([keywords] if keywords else [])
+        logger.info(f"Generated {len(hyde)} HyDE paragraphs + {1 if keywords else 0} keyword variant")
         return {"rewritten_queries": [query] + variants}
     except Exception:
-        logger.exception("Failed to parse HyDE variants")
+        logger.exception("Query rewrite failed; falling back to original query only")
         return {"rewritten_queries": [query]}
 
 
 def grade_relevance(state: AgentState) -> dict:
-    chunks = state.get("retrieved_chunks", [])
-    if not chunks:
-        return {"relevance_score": 0.0, "retry_count": state["retry_count"] + 1}
+    """Score retrieval quality as the mean rerank (or cosine) score of the chunks.
 
-    # Prefer rerank_score when available (more accurate than cosine similarity)
+    Also increments retry_count, which counts completed search->grade cycles.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Partial update with relevance_score and retry_count.
+    """
+    chunks = state.get("retrieved_chunks", [])
+    cycles = state.get("retry_count", 0) + 1
+    if not chunks:
+        return {"relevance_score": 0.0, "retry_count": cycles}
+
     if "rerank_score" in chunks[0]:
         mean_score = sum(c["rerank_score"] for c in chunks) / len(chunks)
-        logger.info(f"Mean rerank score: {mean_score:.3f} from {len(chunks)} chunks")
+        logger.info(f"Mean rerank score: {mean_score:.3f} from {len(chunks)} chunks (cycle {cycles})")
     else:
-        mean_score = sum(c["similarity"] for c in chunks) / len(chunks)
-        logger.info(f"Mean similarity: {mean_score:.3f} from {len(chunks)} chunks")
+        mean_score = sum(c.get("similarity", 0.0) for c in chunks) / len(chunks)
+        logger.info(f"Mean similarity: {mean_score:.3f} from {len(chunks)} chunks (cycle {cycles})")
 
-    return {"relevance_score": mean_score, "retry_count": state["retry_count"] + 1}
+    return {"relevance_score": mean_score, "retry_count": cycles}
 
 
 def generate_answer(state: AgentState) -> dict:
+    """Generate the cited answer from the retrieved chunks.
+
+    Degrades gracefully: on API failure, returns an apologetic answer and sets
+    state["error"] instead of raising.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Partial update with answer, messages, and error.
+    """
     chunks = state.get("retrieved_chunks", [])
+    query = state["query"]
+    prompt = build_answer_prompt(query, chunks, state.get("summary", ""))
 
-    # Number chunks so the model can cite them with [N] markers inline
-    context_parts = []
-    for i, c in enumerate(chunks, start=1):
-        context_parts.append(
-            f"[{i}] SOURCE: {c['source_url']}\nTITLE: {c.get('page_title', 'Untitled')}\nCONTENT: {c['content']}"
+    try:
+        answer = _call_claude(
+            system=ANSWER_SYSTEM,
+            user_prompt=prompt,
+            max_tokens=2048,
+            temperature=0.2,
         )
-    context = "\n\n".join(context_parts) if context_parts else "(no documentation retrieved)"
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        temperature=0.2,
-        system=(
-            "You are an expert on Anthropic prompt engineering. Answer questions ONLY using "
-            "the provided documentation context. Be specific.\n\n"
-            "CITATION RULES:\n"
-            "- Each context chunk is numbered [1], [2], etc.\n"
-            "- Insert the relevant marker [N] inline immediately after each fact you draw from chunk N.\n"
-            "- Use only the numbers actually present in the context. Never invent citations.\n"
-            "- If multiple chunks support a claim, cite all of them, e.g. 'XML tags improve clarity [1][3].'\n"
-            "- If the documentation does not contain the answer, say so directly without citations."
-        ),
-        messages=[
-            {"role": "user", "content": f"Documentation:\n{context}\n\nQuestion: {state['query']}"}
-        ],
-    )
-    answer = response.content[0].text
-    logger.info(f"Generated answer ({len(answer)} chars)")
+        logger.info(f"Generated answer ({len(answer)} chars)")
+        error = ""
+    except Exception as e:
+        logger.exception("Answer generation failed")
+        answer = (
+            "I ran into a problem while generating the answer. Please try again in a moment."
+        )
+        error = f"generate_answer: {type(e).__name__}"
 
     return {
         "answer": answer,
-        "messages": [HumanMessage(content=state["query"]), AIMessage(content=answer)],
+        "error": error,
+        "messages": [HumanMessage(content=query), AIMessage(content=answer)],
     }
+
+
+def save_memory(state: AgentState) -> dict:
+    """Persist the new turn and maintain the rolling summary (long-term memory).
+
+    When the in-context history grows past max_history_messages, the older half
+    is folded into the rolling summary via Claude and trimmed from context.
+    The full transcript always remains in the DB.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Partial update with summary (possibly refreshed).
+    """
+    settings = get_settings()
+    session_id = state["session_id"]
+    query = state["query"]
+    answer = state.get("answer", "")
+    summary = state.get("summary", "")
+
+    # Skip persisting failed turns so a transient error doesn't pollute memory.
+    if not state.get("error"):
+        session_store.append_messages(
+            session_id, [HumanMessage(content=query), AIMessage(content=answer)]
+        )
+
+    messages = session_store.get_history(session_id)
+    if len(messages) <= settings.max_history_messages:
+        return {"summary": summary}
+
+    keep = settings.max_history_messages // 2
+    older = messages[:-keep] if keep else messages
+    try:
+        turns_text = _format_turns(older, limit=len(older), max_chars=500)
+        new_summary = _call_claude(
+            system=SUMMARY_SYSTEM,
+            user_prompt=build_summary_prompt(summary, turns_text),
+            max_tokens=300,
+            temperature=0.0,
+        ).strip()
+        session_store.save_summary(session_id, new_summary)
+        session_store.trim_history(session_id, keep=keep)
+        logger.info(f"Summarized {len(older)} older messages for session {session_id}")
+        return {"summary": new_summary}
+    except Exception:
+        logger.exception("Summarization failed; keeping full history in context")
+        return {"summary": summary}

@@ -1,25 +1,41 @@
-import os
+"""High-level retriever used by the agent's search node and the search_docs tool.
+
+Embeds the query and runs hybrid (vector + full-text RRF) search by default,
+falling back to pure vector search when hybrid is disabled or unavailable.
+"""
+
 import logging
 from typing import Any, Dict, List
 
+from core.config import get_settings
 from ingestion.embedder import embed_query
-from retrieval.vector_store import similarity_search
+from retrieval.vector_store import hybrid_search, similarity_search
 
 logger = logging.getLogger(__name__)
 
-RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "6"))
-# Recall threshold for the cosine-similarity prefilter. Kept low because the reranker
-# (voyage rerank-2) does the precision work downstream. Distinct from RELEVANCE_THRESHOLD,
-# which gates whether the agent retries.
-RECALL_THRESHOLD = float(os.getenv("RECALL_THRESHOLD", "0.30"))
 
+def retrieve(query: str, k: int | None = None, threshold: float | None = None) -> List[Dict[str, Any]]:
+    """Retrieve ranked chunks for a query string.
 
-def retrieve(query: str, k: int = None, threshold: float = None) -> List[Dict[str, Any]]:
-    k = k if k is not None else RETRIEVAL_TOP_K
-    threshold = threshold if threshold is not None else RECALL_THRESHOLD
+    Args:
+        query: Natural-language query (or HyDE paragraph).
+        k: Max chunks to return; defaults to Settings.retrieval_top_k.
+        threshold: Cosine recall floor for the pure-vector path;
+            defaults to Settings.recall_threshold. Ignored by hybrid RRF.
+
+    Returns:
+        Ranked chunk dicts; empty list when nothing matches.
+    """
+    settings = get_settings()
+    k = k if k is not None else settings.retrieval_top_k
+    threshold = threshold if threshold is not None else settings.recall_threshold
 
     embedding = embed_query(query)
-    results = similarity_search(embedding, k, threshold)
+
+    if settings.use_hybrid_search:
+        results = hybrid_search(embedding, query, k=k)
+    else:
+        results = similarity_search(embedding, k=k, threshold=threshold)
 
     if not results:
         logger.warning(f"No chunks retrieved for query: {query[:60]}...")
