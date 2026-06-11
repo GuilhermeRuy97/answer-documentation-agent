@@ -31,7 +31,7 @@ from evaluation.evaluators import (
 setup_logging()
 logger = logging.getLogger(__name__)
 
-DATASET_NAME = "anthropic-prompt-engineering-eval-v1"
+DATASET_NAME = "anthropic-prompt-engineering-eval-v2"
 
 JUDGE_METRICS = ("relevance", "faithfulness", "citation_quality", "answer_relevance")
 
