@@ -1,13 +1,15 @@
 -- =============================================================
 -- setup_supabase.sql
--- Run this once in the Supabase SQL Editor before ingestion.
+-- Run this in the Supabase SQL Editor before ingestion.
+-- Safe to re-run (idempotent), including after
+-- migrate_hybrid_search.sql has been applied.
 -- =============================================================
 
 -- Step 1: Enable the pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Step 2: Create the main chunks table
--- voyage-3-lite produces 512-dimensional embeddings
+-- voyage-4 produces 1024-dimensional embeddings (must match VECTOR(1024))
 CREATE TABLE IF NOT EXISTS docs_chunks (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     content     TEXT        NOT NULL,
@@ -38,16 +40,22 @@ ON docs_chunks (source_url);
 
 -- Step 5: Create the RPC function the agent will call
 -- This is called from Python via: supabase.rpc("match_docs", {...})
+-- DROP first: CREATE OR REPLACE cannot change the return type once
+-- a version of the function exists (e.g. after the hybrid migration).
+-- Defaults mirror RETRIEVAL_TOP_K / RECALL_THRESHOLD in core/config.py.
+DROP FUNCTION IF EXISTS match_docs(VECTOR(1024), INT, FLOAT);
+
 CREATE OR REPLACE FUNCTION match_docs(
     query_embedding  VECTOR(1024),
-    match_count      INT     DEFAULT 5,
-    match_threshold  FLOAT   DEFAULT 0.70
+    match_count      INT     DEFAULT 6,
+    match_threshold  FLOAT   DEFAULT 0.30
 )
 RETURNS TABLE (
     id          UUID,
     content     TEXT,
     source_url  TEXT,
     page_title  TEXT,
+    chunk_index INTEGER,
     similarity  FLOAT
 )
 LANGUAGE plpgsql
@@ -59,6 +67,7 @@ BEGIN
         docs_chunks.content,
         docs_chunks.source_url,
         docs_chunks.page_title,
+        docs_chunks.chunk_index,
         -- cosine similarity = 1 - cosine distance
         1 - (docs_chunks.embedding <=> query_embedding) AS similarity
     FROM docs_chunks

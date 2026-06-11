@@ -26,15 +26,16 @@ ON docs_chunks
 USING gin (fts);
 
 -- -------------------------------------------------------------
--- Step 3: Fix match_docs to also return chunk_index (the Python
--- dedup key needs it; the original function omitted it).
+-- Step 3: Ensure match_docs returns chunk_index (the Python dedup
+-- key needs it). Identical to the definition in setup_supabase.sql;
+-- kept here so older installs created before that fix are upgraded.
 -- -------------------------------------------------------------
 DROP FUNCTION IF EXISTS match_docs(VECTOR(1024), INT, FLOAT);
 
 CREATE OR REPLACE FUNCTION match_docs(
     query_embedding  VECTOR(1024),
-    match_count      INT     DEFAULT 5,
-    match_threshold  FLOAT   DEFAULT 0.70
+    match_count      INT     DEFAULT 6,
+    match_threshold  FLOAT   DEFAULT 0.30
 )
 RETURNS TABLE (
     id          UUID,

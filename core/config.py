@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     generation_model: str = "claude-sonnet-4-6"
     judge_model: str = "claude-opus-4-7"
     embedding_model: str = "voyage-4"
+    # Must match VECTOR(1024) in scripts/setup_supabase.sql / migrate_hybrid_search.sql.
+    embedding_dim: int = 1024
     rerank_model: str = "rerank-2"
 
     # --- Ingestion ---
