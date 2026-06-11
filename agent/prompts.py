@@ -1,6 +1,6 @@
 """All runtime prompts, centralized and written per Anthropic prompt-engineering
 best practices: XML-tagged inputs, explicit role and rules, few-shot examples,
-assistant-prefill for structured outputs, and prompt-injection hardening.
+JSON-schema structured outputs, and prompt-injection hardening.
 """
 
 from typing import Any, Dict, List
@@ -16,9 +16,25 @@ REWRITE_SYSTEM = (
     "queries that maximize recall. You always return valid JSON and nothing else."
 )
 
-# The assistant turn is prefilled with "{" so Claude continues the JSON object
-# directly, without preamble or markdown fences.
-REWRITE_PREFILL = "{"
+# Enforced via output_config.format (structured outputs): assistant prefill is
+# not supported on the Claude 4.6+ family, so the JSON shape is guaranteed by
+# the API instead of a prefilled "{" turn.
+REWRITE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "hyde": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "2 short hypothetical documentation paragraphs",
+        },
+        "keywords": {
+            "type": "string",
+            "description": "One keyword-style full-text query (5-10 terms)",
+        },
+    },
+    "required": ["hyde", "keywords"],
+    "additionalProperties": False,
+}
 
 _REWRITE_EXAMPLE = """<example>
 <question>How do I stop Claude from being too verbose?</question>
