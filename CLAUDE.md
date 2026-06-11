@@ -25,7 +25,7 @@ User Question (UI or POST /ask)
  ▼
 LangGraph Agent
  ├─► load_memory       → history + rolling summary from session store
- ├─► rewrite_query     → 2 HyDE paragraphs + 1 keyword query (JSON prefill)
+ ├─► rewrite_query     → 2 HyDE paragraphs + 1 keyword query (JSON via structured outputs)
  ├─► search_docs       → hybrid_match_docs RPC per variant → RRF fusion → Voyage rerank
  ├─► grade_relevance   → mean rerank score; retry_count counts search→grade cycles
  │     ├─ score < RELEVANCE_THRESHOLD AND retries_used < MAX_RETRY_COUNT → search_docs
@@ -100,7 +100,7 @@ Key tunables and their defaults: `CHUNK_SIZE=1200`, `CHUNK_OVERLAP=200`,
 | File | Responsibility |
 |---|---|
 | `state.py` | `AgentState` TypedDict (includes `summary`, `error`) |
-| `prompts.py` | ALL runtime prompts: XML-tagged, few-shot, prefill constants |
+| `prompts.py` | ALL runtime prompts: XML-tagged, few-shot, structured-output schemas |
 | `nodes.py` | `load_memory`, `rewrite_query`, `grade_relevance`, `generate_answer`, `save_memory`; Claude calls via `core.clients`; per-call latency/token logging |
 | `citations.py` | `build_citations()` shared by graph node and tool |
 | `tools.py` | Thin LangChain tool wrappers over retriever + citations |
